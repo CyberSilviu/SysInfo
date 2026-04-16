@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SysInfo Pro</string>
+
+    <!-- Navigation -->
+    <string name="nav_device">Dispozitiv</string>
+    <string name="nav_benchmark">Benchmark</string>
+    <string name="nav_stress">Stress Test</string>
+
+    <!-- Device Info -->
+    <string name="section_cpu">Procesor (CPU)</string>
+    <string name="section_memory">Memorie</string>
+    <string name="section_display">Ecran</string>
+    <string name="section_battery">Baterie</string>
+    <string name="section_storage">Stocare</string>
+    <string name="section_network">Rețea</string>
+    <string name="section_sensors">Senzori</string>
+    <string name="section_system">Sistem</string>
+    <string name="section_gpu">GPU</string>
+
+    <!-- Benchmark -->
+    <string name="bench_cpu_single">CPU Single-Core</string>
+    <string name="bench_cpu_multi">CPU Multi-Core</string>
+    <string name="bench_memory">Memorie</string>
+    <string name="bench_storage">Stocare I/O</string>
+    <string name="bench_render">Rendering 2D</string>
+    <string name="btn_run_all">▶  RULEAZĂ TOATE</string>
+    <string name="btn_run">RULEAZĂ</string>
+    <string name="score_label">Scor</string>
+
+    <!-- Stress Test -->
+    <string name="stress_cpu">CPU Stress</string>
+    <string name="stress_memory">Memory Stress</string>
+    <string name="stress_mixed">Mixed Stress</string>
+    <string name="btn_start_stress">▶  START</string>
+    <string name="btn_stop_stress">■  STOP</string>
+    <string name="stress_duration">Durată</string>
+    <string name="stress_threads">Thread-uri</string>
+    <string name="stress_temp">Temperatură</string>
+    <string name="stress_status_idle">Inactiv</string>
+    <string name="stress_status_running">Rulează...</string>
+    <string name="stress_status_done">Finalizat</string>
+</resources>

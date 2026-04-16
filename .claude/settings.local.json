@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where gradle:*)",
+      "Bash(gradle --version)",
+      "Bash(~/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle assembleDebug --project-dir \"c:/Users/silviu/Desktop/SysInfo\")",
+      "Read(//c/Program Files/**)",
+      "Read(//c//**)",
+      "Read(//c/Program Files/Android/Android Studio/jbr/**)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ~/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle assembleDebug --project-dir \"c:/Users/silviu/Desktop/SysInfo\")",
+      "Bash(ls c:/Users/silviu/Desktop/SysInfo/*.jks)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" \"C:/Program Files/Android/Android Studio/jbr/bin/keytool\" -genkeypair -v -keystore \"c:/Users/silviu/Desktop/SysInfo/sysinfo-release.jks\" -alias sysinfo -keyalg RSA -keysize 2048 -validity 10000 -storepass sysinfo123 -keypass sysinfo123 -dname \"CN=SysInfo, OU=Dev, O=SysInfo, L=Romania, S=Romania, C=RO\")",
+      "Bash(JAVA_HOME=\"C:/Program Files/Android/Android Studio/jbr\" ~/.gradle/wrapper/dists/gradle-8.13-bin/5xuhj0ry160q40clulazy9h7d/gradle-8.13/bin/gradle assembleRelease --project-dir \"c:/Users/silviu/Desktop/SysInfo\")",
+      "Read(//c/Users/silviu/Desktop/**)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python -c ':*)",
+      "Bash(python -m PyInstaller \"ZF-Info64-Windows.spec\" --distpath ./dist --workpath ./build/pyinstaller --noconfirm)",
+      "Bash(python setup_msi.py bdist_msi)"
+    ]
+  }
+}
