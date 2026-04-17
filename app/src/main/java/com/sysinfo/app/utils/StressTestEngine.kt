@@ -134,22 +134,23 @@ class StressTestEngine {
     // ── Workers ──────────────────────────────────────────────────────────────
 
     private suspend fun cpuWorker() {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
         var x = 1.0
         while (isRunning.get()) {
-            repeat(200_000) { i ->
+            repeat(1_000_000) { i ->
                 x = sin(x) * cos(x) + sqrt(abs(x) + 1.0) + tan(x * 0.001)
                 x = ln(abs(x) + 1.0) * exp(x * 0.0001) + x.pow(1.001)
-                // Integer work mixed in
                 x += (i.toLong() xor 0xDEADBEEFL).toDouble() * 1e-20
             }
-            totalIterations.addAndGet(200_000)
+            totalIterations.addAndGet(1_000_000)
             yield()
         }
     }
 
     private suspend fun memoryWorker(chunks: MutableList<ByteArray>) {
-        val chunkSize = 1024 * 1024  // 1 MB
-        val maxChunks = 128
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+        val chunkSize = 4 * 1024 * 1024  // 4 MB per chunk
+        val maxChunks = 200              // up to ~800 MB pressure
 
         while (isRunning.get()) {
             try {

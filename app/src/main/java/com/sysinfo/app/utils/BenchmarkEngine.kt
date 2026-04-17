@@ -30,6 +30,7 @@ object BenchmarkEngine {
 
     suspend fun runCpuSingleCore(onProgress: (Int) -> Unit): BenchmarkResult =
         withContext(Dispatchers.Default) {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
             onProgress(5)
             val iterations = 60_000_000
             var result = 0.0
@@ -54,6 +55,7 @@ object BenchmarkEngine {
 
     suspend fun runCpuInteger(onProgress: (Int) -> Unit): BenchmarkResult =
         withContext(Dispatchers.Default) {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
             onProgress(5)
             val iterations = 80_000_000
             var acc = 0L
@@ -81,6 +83,7 @@ object BenchmarkEngine {
 
     suspend fun runCpuMultiCore(onProgress: (Int) -> Unit): BenchmarkResult =
         withContext(Dispatchers.Default) {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
             onProgress(5)
             val numCores = Runtime.getRuntime().availableProcessors()
             val iterationsPerCore = 60_000_000 / numCores
@@ -117,6 +120,7 @@ object BenchmarkEngine {
 
     suspend fun runMemoryBenchmark(onProgress: (Int) -> Unit): BenchmarkResult =
         withContext(Dispatchers.Default) {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
             onProgress(5)
             val arraySize = 16_000_000   // 64 MB as int array
             val passes    = 4

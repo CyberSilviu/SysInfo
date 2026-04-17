@@ -19,7 +19,7 @@ try:
 except ImportError:
     HAS_PIL = False
 
-import platform, concurrent.futures, tempfile
+import platform, concurrent.futures, tempfile, subprocess, multiprocessing
 
 # ── Palette ───────────────────────────────────────────────────────────────────
 BG       = "#0D1117"
@@ -53,6 +53,75 @@ def fmt_large(n):
     return str(n)
 
 def clamp(v, lo, hi): return max(lo, min(hi, v))
+
+# ── Windows hardware query helpers ────────────────────────────────────────────
+def _wmic_values(wmic_args):
+    """Run a wmic /format:list query and return dict of key→value for first record."""
+    try:
+        r = subprocess.run(
+            ["wmic"] + wmic_args + ["/format:list"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=0x08000000)  # CREATE_NO_WINDOW
+        return {k.strip(): v.strip()
+                for line in r.stdout.splitlines()
+                if "=" in line
+                for k, v in [line.split("=", 1)]
+                if v.strip()}
+    except Exception:
+        return {}
+
+def _wmic_list_values(wmic_args, key):
+    """Run a wmic /format:list query and return all values for a given key."""
+    try:
+        r = subprocess.run(
+            ["wmic"] + wmic_args + ["/format:list"],
+            capture_output=True, text=True, timeout=8,
+            creationflags=0x08000000)
+        return [line.split("=", 1)[1].strip()
+                for line in r.stdout.splitlines()
+                if line.startswith(key + "=") and line.split("=", 1)[1].strip()]
+    except Exception:
+        return []
+
+def _get_cpu_name_windows():
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                             r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+        name = winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
+        key.Close()
+        return name if name else None
+    except Exception:
+        pass
+    vals = _wmic_values(["cpu", "get", "Name"])
+    return vals.get("Name") or None
+
+def _get_disk_models():
+    return _wmic_list_values(["diskdrive", "get", "Model"], "Model")
+
+def _get_active_nics():
+    return _wmic_list_values(
+        ["nic", "where", "NetConnectionStatus=2", "get", "Name"], "Name")
+
+def _get_battery_cycle_count():
+    vals = _wmic_values(["path", "Win32_Battery", "get", "CycleCount"])
+    v = vals.get("CycleCount", "")
+    return v if v and v != "0" else None
+
+# ── Module-level CPU stress worker (must be top-level for multiprocessing pickle) ──
+def _cpu_stress_worker_fn():
+    import math
+    try:
+        import ctypes
+        h = ctypes.windll.kernel32.GetCurrentThread()
+        ctypes.windll.kernel32.SetThreadPriority(h, 2)  # THREAD_PRIORITY_HIGHEST
+    except Exception:
+        pass
+    x = 1.0
+    while True:
+        for i in range(500_000):
+            x = math.sin(x) * math.cos(x) + math.sqrt(abs(x) + 1.0)
+            x = math.log(abs(x) + 1.0) * math.exp(x * 0.0001)
 
 # ── Scrollable Frame helper ───────────────────────────────────────────────────
 class ScrollFrame(tk.Frame):
@@ -209,12 +278,14 @@ def collect_sysinfo():
     S("SISTEM OPERARE")
     R("OS",          platform.system() + " " + platform.release())
     R("Versiune",    platform.version()[:60])
-    R("Arhitectură", platform.machine())
+    arch = platform.machine()
+    arch_str = f"x64 ({arch})" if arch in ("AMD64", "x86_64") else arch
+    R("Arhitectură", arch_str)
     R("Hostname",    platform.node())
 
     S("PROCESOR (CPU)")
-    cpu_name = platform.processor() or "N/A"
-    R("Model", cpu_name[:55])
+    cpu_name = _get_cpu_name_windows() or platform.processor() or "N/A"
+    R("Model", cpu_name[:70])
     if HAS_PSUTIL:
         R("Nuclee fizice",   str(psutil.cpu_count(logical=False)))
         R("Nuclee logice",   str(psutil.cpu_count(logical=True)))
@@ -240,6 +311,9 @@ def collect_sysinfo():
             R("Swap utilizat",fmt_bytes(sw.used))
 
     S("STOCARE")
+    disk_models = _get_disk_models()
+    for i, model in enumerate(disk_models):
+        R(f"Disc {i}", model[:60], CYAN)
     if HAS_PSUTIL:
         for part in psutil.disk_partitions():
             try:
@@ -250,6 +324,9 @@ def collect_sysinfo():
                 pass
 
     S("REȚEA")
+    active_nics = _get_active_nics()
+    for nic in active_nics[:4]:
+        R("Adaptor activ", nic[:55], CYAN)
     if HAS_PSUTIL:
         try:
             nio = psutil.net_io_counters()
@@ -276,6 +353,9 @@ def collect_sysinfo():
                 if bat.secsleft and bat.secsleft > 0:
                     h, r = divmod(int(bat.secsleft), 3600)
                     R("Timp rămas", f"{h}h {r//60}m")
+                cycle = _get_battery_cycle_count()
+                if cycle:
+                    R("Cicluri încărcare", cycle, ORANGE)
             else:
                 R("Baterie", "Nedetectată / Desktop", T2)
         except Exception:
@@ -392,6 +472,7 @@ class StressEngine:
     def __init__(self):
         self._running = threading.Event()
         self._threads = []
+        self._cpu_procs = []
         self._iters = 0
         self._chunks = []
         self._lock = threading.Lock()
@@ -402,26 +483,43 @@ class StressEngine:
     def start(self, stype, n_threads, duration, on_stats, on_done):
         if self._running.is_set(): return
         self._running.set(); self._iters = 0; self._chunks.clear()
-        for i in range(n_threads):
-            w = self._cpu if stype == "CPU" else \
-                self._mem if stype == "MEM" else \
-                (self._cpu if i%2==0 else self._mem)
-            threading.Thread(target=w, daemon=True).start()
+
+        cpu_count = n_threads if stype == "CPU" else (n_threads // 2 if stype == "MIXED" else 0)
+        mem_count = n_threads if stype == "MEM" else (n_threads - n_threads // 2 if stype == "MIXED" else 0)
+
+        for _ in range(cpu_count):
+            p = multiprocessing.Process(target=_cpu_stress_worker_fn, daemon=True)
+            p.start()
+            self._cpu_procs.append(p)
+
+        for _ in range(mem_count):
+            threading.Thread(target=self._mem, daemon=True).start()
+
         threading.Thread(target=self._monitor,
                          args=(n_threads, duration, on_stats, on_done),
                          daemon=True).start()
 
     def stop(self):
         self._running.clear()
+        for p in self._cpu_procs:
+            try: p.terminate()
+            except Exception: pass
+        self._cpu_procs.clear()
         with self._lock: self._chunks.clear()
 
     def _cpu(self):
+        try:
+            import ctypes
+            h = ctypes.windll.kernel32.GetCurrentThread()
+            ctypes.windll.kernel32.SetThreadPriority(h, 2)
+        except Exception:
+            pass
         x = 1.0
         while self._running.is_set():
-            for i in range(200_000):
+            for i in range(500_000):
                 x = math.sin(x)*math.cos(x)+math.sqrt(abs(x)+1.0)
                 x = math.log(abs(x)+1.0)*math.exp(x*0.0001)
-            with self._lock: self._iters += 200_000
+            with self._lock: self._iters += 500_000
 
     def _mem(self):
         while self._running.is_set():
@@ -869,6 +967,7 @@ class App(tk.Tk):
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     try: ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception: pass
 

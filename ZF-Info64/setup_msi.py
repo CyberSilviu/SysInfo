@@ -7,11 +7,11 @@ from pathlib import Path
 from cx_Freeze import setup, Executable
 
 build_exe_options = {
-    "packages": ["psutil", "tkinter", "PIL"],
+    "packages": ["psutil", "tkinter", "PIL", "urllib"],
     "include_files": [
         ("logo ZF-Logo64.png", "logo ZF-Logo64.png"),
     ],
-    "excludes": ["unittest", "email", "html", "http", "urllib",
+    "excludes": ["unittest", "email", "html", "http",
                  "xmlrpc", "pydoc", "doctest", "difflib"],
     "optimize": 1,
 }

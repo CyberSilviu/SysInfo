@@ -7,7 +7,9 @@ a = Analysis(
     datas=[
         ('logo ZF-Logo64.png', '.'),
     ],
-    hiddenimports=['psutil', 'PIL', 'PIL.Image', 'PIL.ImageTk'],
+    hiddenimports=['psutil', 'PIL', 'PIL.Image', 'PIL.ImageTk',
+                   'urllib', 'urllib.parse', 'urllib.request', 'urllib.response',
+                   'urllib.error', 'urllib.robotparser', 'pathlib'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
