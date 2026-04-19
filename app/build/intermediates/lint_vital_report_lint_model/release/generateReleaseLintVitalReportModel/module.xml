@@ -1,6 +1,6 @@
 <lint-module
     format="1"
-    dir="C:\Users\silviu\Desktop\SysInfo\app"
+    dir="C:\Users\Silviu\Desktop\SysInfo\app"
     name=":app"
     type="APP"
     maven="SysInfo:app:unspecified"

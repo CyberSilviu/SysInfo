@@ -20719,7 +20719,6 @@ kotlin.collections.ArraysKt___ArraysKt:
     public static final boolean contains(char[],char)
     public static final synthetic boolean contains(double[],double)
     public static final synthetic boolean contains(float[],float)
-    public static final boolean contains(int[],int)
     public static final boolean contains(long[],long)
     public static final boolean contains(short[],short)
     public static final boolean contains(boolean[],boolean)
@@ -21094,7 +21093,6 @@ kotlin.collections.ArraysKt___ArraysKt:
     public static final int indexOf(char[],char)
     public static final synthetic int indexOf(double[],double)
     public static final synthetic int indexOf(float[],float)
-    public static final int indexOf(int[],int)
     public static final int indexOf(long[],long)
     public static final int indexOf(short[],short)
     public static final int indexOf(boolean[],boolean)
@@ -22236,10 +22234,8 @@ kotlin.collections.CollectionsKt__IterablesKt:
     public static final java.lang.Integer collectionSizeOrNull(java.lang.Iterable)
     public static final java.util.List flatten(java.lang.Iterable)
     public static final kotlin.Pair unzip(java.lang.Iterable)
-kotlin.collections.CollectionsKt__IteratorsJVMKt$iterator$1
 kotlin.collections.CollectionsKt__IteratorsJVMKt:
     public void <init>()
-    public static final java.util.Iterator iterator(java.util.Enumeration)
 kotlin.collections.CollectionsKt__IteratorsKt:
     public void <init>()
     public static final void forEach(java.util.Iterator,kotlin.jvm.functions.Function1)
@@ -34129,6 +34125,8 @@ kotlin.collections.CollectionsKt:
 kotlin.collections.CollectionsKt__CollectionsKt:
     public static java.util.List emptyList()
     public static varargs java.util.ArrayList mutableListOf(java.lang.Object[])
+kotlin.collections.CollectionsKt__IteratorsJVMKt:
+    public static kotlin.collections.CollectionsKt__IteratorsJVMKt$iterator$1 iterator(java.util.Enumeration)
 kotlin.collections.CollectionsKt__MutableCollectionsKt:
     public static java.lang.Object removeFirst(java.util.ArrayList)
 kotlin.collections.CollectionsKt___CollectionsKt
@@ -34342,7 +34340,7 @@ kotlin.text.StringsKt__StringsKt$rangesDelimitedBy$2:
 kotlin.text.StringsKt__StringsKt$splitToSequence$1:
     public static java.lang.String invoke$3()
 kotlin.text.StringsKt__StringsKt:
-    public static synthetic int indexOf$StringsKt__StringsKt$default(java.lang.CharSequence,java.lang.String,int,int,boolean)
+    public static synthetic int indexOf$StringsKt__StringsKt$default(java.lang.CharSequence,java.lang.CharSequence,int,int,boolean)
     public static final void requireNonNegativeLimit()
 kotlin.text.StringsKt___StringsJvmKt
 kotlin.text.StringsKt___StringsKt

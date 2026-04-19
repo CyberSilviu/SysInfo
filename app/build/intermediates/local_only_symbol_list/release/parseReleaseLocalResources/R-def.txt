@@ -46,6 +46,7 @@ id cpuFreqContainer
 id cpuInfoContainer
 id deviceFragment
 id displayInfoContainer
+id gpuInfoContainer
 id header
 id headerDivider
 id memInfoContainer

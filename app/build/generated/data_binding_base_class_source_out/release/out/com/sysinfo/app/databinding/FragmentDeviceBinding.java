@@ -36,6 +36,9 @@ public final class FragmentDeviceBinding implements ViewBinding {
   public final LinearLayout displayInfoContainer;
 
   @NonNull
+  public final LinearLayout gpuInfoContainer;
+
+  @NonNull
   public final LinearLayout memInfoContainer;
 
   @NonNull
@@ -56,16 +59,17 @@ public final class FragmentDeviceBinding implements ViewBinding {
   private FragmentDeviceBinding(@NonNull ScrollView rootView,
       @NonNull LinearLayout batteryInfoContainer, @NonNull ProgressBar batteryProgressBar,
       @NonNull LinearLayout cpuFreqContainer, @NonNull LinearLayout cpuInfoContainer,
-      @NonNull LinearLayout displayInfoContainer, @NonNull LinearLayout memInfoContainer,
-      @NonNull ProgressBar memProgressBar, @NonNull LinearLayout sensorsInfoContainer,
-      @NonNull LinearLayout storageInfoContainer, @NonNull ProgressBar storageProgressBar,
-      @NonNull LinearLayout systemInfoContainer) {
+      @NonNull LinearLayout displayInfoContainer, @NonNull LinearLayout gpuInfoContainer,
+      @NonNull LinearLayout memInfoContainer, @NonNull ProgressBar memProgressBar,
+      @NonNull LinearLayout sensorsInfoContainer, @NonNull LinearLayout storageInfoContainer,
+      @NonNull ProgressBar storageProgressBar, @NonNull LinearLayout systemInfoContainer) {
     this.rootView = rootView;
     this.batteryInfoContainer = batteryInfoContainer;
     this.batteryProgressBar = batteryProgressBar;
     this.cpuFreqContainer = cpuFreqContainer;
     this.cpuInfoContainer = cpuInfoContainer;
     this.displayInfoContainer = displayInfoContainer;
+    this.gpuInfoContainer = gpuInfoContainer;
     this.memInfoContainer = memInfoContainer;
     this.memProgressBar = memProgressBar;
     this.sensorsInfoContainer = sensorsInfoContainer;
@@ -131,6 +135,12 @@ public final class FragmentDeviceBinding implements ViewBinding {
         break missingId;
       }
 
+      id = R.id.gpuInfoContainer;
+      LinearLayout gpuInfoContainer = ViewBindings.findChildViewById(rootView, id);
+      if (gpuInfoContainer == null) {
+        break missingId;
+      }
+
       id = R.id.memInfoContainer;
       LinearLayout memInfoContainer = ViewBindings.findChildViewById(rootView, id);
       if (memInfoContainer == null) {
@@ -169,8 +179,8 @@ public final class FragmentDeviceBinding implements ViewBinding {
 
       return new FragmentDeviceBinding((ScrollView) rootView, batteryInfoContainer,
           batteryProgressBar, cpuFreqContainer, cpuInfoContainer, displayInfoContainer,
-          memInfoContainer, memProgressBar, sensorsInfoContainer, storageInfoContainer,
-          storageProgressBar, systemInfoContainer);
+          gpuInfoContainer, memInfoContainer, memProgressBar, sensorsInfoContainer,
+          storageInfoContainer, storageProgressBar, systemInfoContainer);
     }
     String missingId = rootView.getResources().getResourceName(id);
     throw new NullPointerException("Missing required view with ID: ".concat(missingId));

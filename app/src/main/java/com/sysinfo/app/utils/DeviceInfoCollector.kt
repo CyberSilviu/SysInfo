@@ -94,18 +94,38 @@ object DeviceInfoCollector {
     }
 
     fun getSocName(): String {
+        // 1. Build.SOC_MODEL (API 31+) → look up commercial name
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val soc = Build.SOC_MODEL
-            if (soc != Build.UNKNOWN && soc.isNotBlank()) return soc
+            if (soc != Build.UNKNOWN && soc.isNotBlank()) {
+                lookupSocName(soc)?.let { return it }
+                // If no lookup hit, still return the raw code (better than nothing)
+                return soc
+            }
         }
+        // 2. ro.board.platform property (platform codename like "lahaina", "taro")
+        val platform = getSystemProp("ro.board.platform")
+        if (platform.isNotEmpty()) {
+            lookupSocName(platform)?.let { return it }
+        }
+        // 3. /proc/cpuinfo "Hardware" line
         try {
             val cpuInfo = File("/proc/cpuinfo").readText()
             val hardware = cpuInfo.lines()
                 .firstOrNull { it.startsWith("Hardware") }
                 ?.substringAfter(":")?.trim()
-            if (!hardware.isNullOrEmpty()) return hardware
+            if (!hardware.isNullOrEmpty()) {
+                lookupSocName(hardware)?.let { return it }
+                return hardware
+            }
         } catch (_: Exception) {}
-        return Build.HARDWARE
+        // 4. ro.chipname or ro.hardware fallback
+        val chipname = getSystemProp("ro.chipname")
+        if (chipname.isNotEmpty()) {
+            lookupSocName(chipname)?.let { return it }
+            return chipname
+        }
+        return lookupSocName(Build.HARDWARE) ?: Build.HARDWARE
     }
 
     fun getCoreFrequencies(): List<Pair<Int, Long>> {
@@ -409,16 +429,191 @@ object DeviceInfoCollector {
         }
     }
 
-    // ==================== GPU (best-effort) ====================
+    // ==================== GPU ====================
 
-    fun getGpuInfo(): List<InfoItem> {
+    private val SOC_GPU = mapOf(
+        // Qualcomm Snapdragon
+        "Qualcomm Snapdragon 8 Gen 3"   to "Qualcomm Adreno 750",
+        "Qualcomm Snapdragon 8s Gen 3"  to "Qualcomm Adreno 735",
+        "Qualcomm Snapdragon 8 Gen 2"   to "Qualcomm Adreno 740",
+        "Qualcomm Snapdragon 8+ Gen 1"  to "Qualcomm Adreno 730",
+        "Qualcomm Snapdragon 8 Gen 1"   to "Qualcomm Adreno 730",
+        "Qualcomm Snapdragon 888+"      to "Qualcomm Adreno 660",
+        "Qualcomm Snapdragon 888"       to "Qualcomm Adreno 660",
+        "Qualcomm Snapdragon 870"       to "Qualcomm Adreno 650",
+        "Qualcomm Snapdragon 865+"      to "Qualcomm Adreno 650",
+        "Qualcomm Snapdragon 865"       to "Qualcomm Adreno 650",
+        "Qualcomm Snapdragon 855+"      to "Qualcomm Adreno 640",
+        "Qualcomm Snapdragon 855"       to "Qualcomm Adreno 640",
+        "Qualcomm Snapdragon 7+ Gen 2"  to "Qualcomm Adreno 725",
+        "Qualcomm Snapdragon 7 Gen 3"   to "Qualcomm Adreno 720",
+        "Qualcomm Snapdragon 7s Gen 3"  to "Qualcomm Adreno 710",
+        "Qualcomm Snapdragon 6 Gen 1"   to "Qualcomm Adreno 710",
+        "Qualcomm Snapdragon 7 Gen 1"   to "Qualcomm Adreno 644",
+        "Qualcomm Snapdragon 780G"      to "Qualcomm Adreno 642L",
+        "Qualcomm Snapdragon 778G"      to "Qualcomm Adreno 642L",
+        "Qualcomm Snapdragon 695"       to "Qualcomm Adreno 619",
+        "Qualcomm Snapdragon 480+"      to "Qualcomm Adreno 619",
+        "Qualcomm Snapdragon 480"       to "Qualcomm Adreno 619",
+        "Qualcomm Snapdragon 680"       to "Qualcomm Adreno 610",
+        "Qualcomm Snapdragon 662"       to "Qualcomm Adreno 610",
+        "Qualcomm Snapdragon 765G"      to "Qualcomm Adreno 620",
+        // MediaTek
+        "MediaTek Dimensity 9300"       to "ARM Immortalis-G720 MC12",
+        "MediaTek Dimensity 9200+"      to "IMG BXM-8-256",
+        "MediaTek Dimensity 9200"       to "IMG BXM-8-256",
+        "MediaTek Dimensity 8200"       to "ARM Mali-G610 MC6",
+        "MediaTek Dimensity 8100"       to "ARM Mali-G610 MC6",
+        "MediaTek Dimensity 1200"       to "ARM Mali-G77 MC9",
+        "MediaTek Dimensity 1100"       to "ARM Mali-G77 MC9",
+        "MediaTek Dimensity 1000+"      to "ARM Mali-G77 MC9",
+        "MediaTek Dimensity 720"        to "ARM Mali-G57 MC3",
+        "MediaTek Dimensity 700"        to "ARM Mali-G57 MC2",
+        "MediaTek Helio G90T"           to "ARM Mali-G76 MC4",
+        "MediaTek Helio G85"            to "ARM Mali-G52 MC2",
+        "MediaTek Helio G80"            to "ARM Mali-G52 MC2",
+        // Samsung Exynos
+        "Samsung Exynos 2400"           to "Samsung Xclipse 940",
+        "Samsung Exynos 2200"           to "AMD Xclipse 920 (RDNA 2)",
+        "Samsung Exynos 2100"           to "ARM Mali-G78 MP14",
+        "Samsung Exynos 990"            to "ARM Mali-G77 MP11",
+        "Samsung Exynos 980"            to "ARM Mali-G76 MP5",
+        // HiSilicon Kirin
+        "HiSilicon Kirin 9000"          to "ARM Mali-G78 MP24",
+        "HiSilicon Kirin 990"           to "ARM Mali-G76 MP16",
+        "HiSilicon Kirin 970"           to "ARM Mali-G72 MP12"
+    )
+
+    private val SOC_NAMES = mapOf(
+        // Qualcomm SM codes
+        "SM8650"    to "Qualcomm Snapdragon 8 Gen 3",
+        "SM8635"    to "Qualcomm Snapdragon 8s Gen 3",
+        "SM8550"    to "Qualcomm Snapdragon 8 Gen 2",
+        "SM8475"    to "Qualcomm Snapdragon 8+ Gen 1",
+        "SM8450"    to "Qualcomm Snapdragon 8 Gen 1",
+        "SM8350AB"  to "Qualcomm Snapdragon 888+",
+        "SM8350"    to "Qualcomm Snapdragon 888",
+        "SM8325"    to "Qualcomm Snapdragon 870",
+        "SM8250AB"  to "Qualcomm Snapdragon 865+",
+        "SM8250"    to "Qualcomm Snapdragon 865",
+        "SM8150AC"  to "Qualcomm Snapdragon 855+",
+        "SM8150"    to "Qualcomm Snapdragon 855",
+        "SM7675"    to "Qualcomm Snapdragon 7s Gen 3",
+        "SM7550"    to "Qualcomm Snapdragon 7 Gen 3",
+        "SM7475"    to "Qualcomm Snapdragon 7+ Gen 2",
+        "SM7450"    to "Qualcomm Snapdragon 7 Gen 1",
+        "SM7350"    to "Qualcomm Snapdragon 780G",
+        "SM7325"    to "Qualcomm Snapdragon 778G",
+        "SM6450"    to "Qualcomm Snapdragon 6 Gen 1",
+        "SM6375"    to "Qualcomm Snapdragon 695",
+        "SM6225"    to "Qualcomm Snapdragon 680",
+        "SM6115"    to "Qualcomm Snapdragon 662",
+        "SM4350AC"  to "Qualcomm Snapdragon 480+",
+        "SM4350"    to "Qualcomm Snapdragon 480",
+        "SM7250"    to "Qualcomm Snapdragon 765G",
+        // Qualcomm platform codenames (from /proc/cpuinfo Hardware or ro.board.platform)
+        "pineapple" to "Qualcomm Snapdragon 8 Gen 3",
+        "kalama"    to "Qualcomm Snapdragon 8 Gen 2",
+        "taro"      to "Qualcomm Snapdragon 8 Gen 1",
+        "waipio"    to "Qualcomm Snapdragon 8 Gen 1",
+        "lahaina"   to "Qualcomm Snapdragon 888",
+        "kona"      to "Qualcomm Snapdragon 865",
+        "msmnile"   to "Qualcomm Snapdragon 855",
+        "lito"      to "Qualcomm Snapdragon 765G",
+        "bengal"    to "Qualcomm Snapdragon 662",
+        // MediaTek MT codes
+        "MT6989"    to "MediaTek Dimensity 9300",
+        "MT6985"    to "MediaTek Dimensity 9200+",
+        "MT6983"    to "MediaTek Dimensity 9200",
+        "MT6896"    to "MediaTek Dimensity 8200",
+        "MT6895"    to "MediaTek Dimensity 8100",
+        "MT6893"    to "MediaTek Dimensity 1200",
+        "MT6891"    to "MediaTek Dimensity 1100",
+        "MT6889"    to "MediaTek Dimensity 1000+",
+        "MT6853"    to "MediaTek Dimensity 720",
+        "MT6833"    to "MediaTek Dimensity 700",
+        "MT6785"    to "MediaTek Helio G90T",
+        "MT6769"    to "MediaTek Helio G85",
+        "MT6765"    to "MediaTek Helio G80",
+        // Samsung Exynos platform codes
+        "s5e9945"   to "Samsung Exynos 2400",
+        "s5e9925"   to "Samsung Exynos 2200",
+        "s5e9840"   to "Samsung Exynos 2100",
+        "s5e9830"   to "Samsung Exynos 990",
+        "exynos2400" to "Samsung Exynos 2400",
+        "exynos2200" to "Samsung Exynos 2200",
+        "exynos2100" to "Samsung Exynos 2100",
+        "exynos990"  to "Samsung Exynos 990",
+        "exynos980"  to "Samsung Exynos 980",
+        // Kirin
+        "kirin9000" to "HiSilicon Kirin 9000",
+        "kirin990"  to "HiSilicon Kirin 990",
+        "kirin970"  to "HiSilicon Kirin 970"
+    )
+
+    private fun getSystemProp(prop: String): String {
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("getprop", prop))
+            val result = p.inputStream.bufferedReader().readLine()?.trim() ?: ""
+            p.destroy()
+            result
+        } catch (_: Exception) { "" }
+    }
+
+    private fun lookupSocName(raw: String): String? {
+        val key = raw.uppercase().replace("-", "").replace("_", "").replace(" ", "")
+        SOC_NAMES.forEach { (k, v) ->
+            if (key == k.uppercase().replace("-", "").replace("_", "")) return v
+        }
+        val lower = raw.lowercase()
+        SOC_NAMES.forEach { (k, v) ->
+            if (lower == k.lowercase()) return v
+        }
+        return null
+    }
+
+    fun getGpuInfo(context: Context): List<InfoItem> {
         val items = mutableListOf<InfoItem>()
+
+        val socName = getSocName()
+        val gpuName: String = SOC_GPU[socName]
+            ?: run {
+                val egl = getSystemProp("ro.hardware.egl").lowercase()
+                when {
+                    egl.contains("adreno") -> "Qualcomm Adreno"
+                    egl.contains("mali")   -> "ARM Mali"
+                    egl.contains("sgx")    -> "PowerVR SGX"
+                    egl.isNotEmpty()       -> egl
+                    else                   -> {
+                        val board = getSystemProp("ro.board.platform").lowercase()
+                        when {
+                            board.contains("qcom") || board.startsWith("sm") -> "Qualcomm Adreno"
+                            board.contains("mt") || board.contains("mtk")    -> "ARM Mali"
+                            else -> "N/A"
+                        }
+                    }
+                }
+            }
+
+        items.add(InfoItem("GPU", gpuName))
+
+        // OpenGL ES version from ActivityManager
         try {
-            val renderer = System.getProperty("ro.hardware.egl") ?: "N/A"
-            items.add(InfoItem("EGL", renderer))
-        } catch (_: Exception) {}
-        items.add(InfoItem("OpenGL ES", getOpenGLVersion()))
-        items.add(InfoItem("Vulkan",    getVulkanSupport()))
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val glVersion = am.deviceConfigurationInfo.reqGlEsVersion
+            val major = glVersion ushr 16
+            val minor = glVersion and 0xFFFF
+            items.add(InfoItem("OpenGL ES", "$major.$minor"))
+        } catch (_: Exception) {
+            items.add(InfoItem("OpenGL ES", getOpenGLVersion()))
+        }
+
+        items.add(InfoItem("Vulkan", getVulkanSupport()))
+
+        // EGL driver hint
+        val eglDriver = getSystemProp("ro.hardware.egl")
+        if (eglDriver.isNotEmpty()) items.add(InfoItem("EGL driver", eglDriver))
+
         return items
     }
 

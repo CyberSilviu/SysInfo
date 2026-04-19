@@ -55,60 +55,106 @@ def fmt_large(n):
 def clamp(v, lo, hi): return max(lo, min(hi, v))
 
 # ── Windows hardware query helpers ────────────────────────────────────────────
-def _wmic_values(wmic_args):
-    """Run a wmic /format:list query and return dict of key→value for first record."""
-    try:
-        r = subprocess.run(
-            ["wmic"] + wmic_args + ["/format:list"],
-            capture_output=True, text=True, timeout=8,
-            creationflags=0x08000000)  # CREATE_NO_WINDOW
-        return {k.strip(): v.strip()
-                for line in r.stdout.splitlines()
-                if "=" in line
-                for k, v in [line.split("=", 1)]
-                if v.strip()}
-    except Exception:
-        return {}
+import os as _os
+_PS = _os.path.join(
+    _os.environ.get("SystemRoot", r"C:\Windows"),
+    "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 
-def _wmic_list_values(wmic_args, key):
-    """Run a wmic /format:list query and return all values for a given key."""
+# One combined PowerShell call — all hardware data in a single process launch.
+_HW_CACHE = None
+
+def _load_hw_cache():
+    global _HW_CACHE
+    if _HW_CACHE is not None:
+        return _HW_CACHE
+    ps_script = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+# CPU
+$cpu = (Get-WmiObject Win32_Processor | Select-Object -First 1).Name
+"CPU:$($cpu.Trim())"
+# Disks
+Get-WmiObject Win32_DiskDrive | ForEach-Object { "DISK:$($_.Model.Trim())" }
+# Active NICs
+Get-WmiObject Win32_NetworkAdapter | Where-Object { $_.NetConnectionStatus -eq 2 } |
+    ForEach-Object { "NIC:$($_.Name.Trim())" }
+# RAM modules
+Get-WmiObject Win32_PhysicalMemory | ForEach-Object {
+    $cap  = [math]::Round($_.Capacity / 1GB, 0)
+    $type = switch ([int]$_.SMBIOSMemoryType) {
+        20 {"DDR"} 21 {"DDR2"} 24 {"DDR3"}
+        26 {"DDR4"} 27 {"LPDDR4"} 34 {"DDR5"} 35 {"LPDDR5"} default {"DDR"}
+    }
+    $mfr = $_.Manufacturer.Trim()
+    $pn  = $_.PartNumber.Trim()
+    $spd = $_.Speed
+    "RAM:${cap}GB $type ${spd}MHz $mfr $pn"
+}
+# Battery cycle count
+$bat = (Get-WmiObject Win32_Battery | Select-Object -First 1).CycleCount
+if ($bat -gt 0) { "BATCYCLE:$bat" }
+"""
+    result = {"cpu": None, "disks": [], "nics": [], "ram": [], "bat_cycle": None}
     try:
         r = subprocess.run(
-            ["wmic"] + wmic_args + ["/format:list"],
-            capture_output=True, text=True, timeout=8,
+            [_PS, "-NoProfile", "-NonInteractive", "-Command", ps_script],
+            capture_output=True, text=True, timeout=20,
             creationflags=0x08000000)
-        return [line.split("=", 1)[1].strip()
-                for line in r.stdout.splitlines()
-                if line.startswith(key + "=") and line.split("=", 1)[1].strip()]
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("CPU:"):
+                v = line[4:].strip()
+                if v:
+                    result["cpu"] = v
+            elif line.startswith("DISK:"):
+                v = line[5:].strip()
+                if v:
+                    result["disks"].append(v)
+            elif line.startswith("NIC:"):
+                v = line[4:].strip()
+                if v:
+                    result["nics"].append(v)
+            elif line.startswith("RAM:"):
+                v = line[4:].strip()
+                if v:
+                    result["ram"].append(v)
+            elif line.startswith("BATCYCLE:"):
+                v = line[9:].strip()
+                if v and v != "0":
+                    result["bat_cycle"] = v
     except Exception:
-        return []
+        pass
+    _HW_CACHE = result
+    return result
 
 def _get_cpu_name_windows():
+    # winreg is instantaneous and works without any subprocess
     try:
         import winreg
         key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
                              r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
         name = winreg.QueryValueEx(key, "ProcessorNameString")[0].strip()
         key.Close()
-        return name if name else None
+        if name:
+            return name
     except Exception:
         pass
-    vals = _wmic_values(["cpu", "get", "Name"])
-    return vals.get("Name") or None
+    return _load_hw_cache().get("cpu")
 
 def _get_disk_models():
-    return _wmic_list_values(["diskdrive", "get", "Model"], "Model")
+    return _load_hw_cache()["disks"]
 
 def _get_active_nics():
-    return _wmic_list_values(
-        ["nic", "where", "NetConnectionStatus=2", "get", "Name"], "Name")
+    return _load_hw_cache()["nics"]
+
+def _get_ram_modules():
+    return _load_hw_cache()["ram"]
 
 def _get_battery_cycle_count():
-    vals = _wmic_values(["path", "Win32_Battery", "get", "CycleCount"])
-    v = vals.get("CycleCount", "")
-    return v if v and v != "0" else None
+    return _load_hw_cache()["bat_cycle"]
 
-# ── Module-level CPU stress worker (must be top-level for multiprocessing pickle) ──
+# ── Module-level workers (must be top-level for multiprocessing/ProcessPoolExecutor) ──
 def _cpu_stress_worker_fn():
     import math
     try:
@@ -122,6 +168,46 @@ def _cpu_stress_worker_fn():
         for i in range(500_000):
             x = math.sin(x) * math.cos(x) + math.sqrt(abs(x) + 1.0)
             x = math.log(abs(x) + 1.0) * math.exp(x * 0.0001)
+
+def _bench_cpu_worker_fn(n_iters):
+    """Worker for ProcessPoolExecutor multi-core benchmark."""
+    import math
+    try:
+        import ctypes
+        h = ctypes.windll.kernel32.GetCurrentThread()
+        ctypes.windll.kernel32.SetThreadPriority(h, 2)
+    except Exception:
+        pass
+    x = 0.0
+    for i in range(n_iters):
+        x += math.sin(i) * math.cos(i) + math.sqrt(i + 1.0)
+    return x
+
+# ── Windows CPU temperature (psutil returns nothing on Windows) ──
+_win_temp_cache = [-1.0, 0.0]
+
+def _get_windows_temp():
+    now = time.time()
+    if now - _win_temp_cache[1] < 5.0 and _win_temp_cache[0] > 0:
+        return _win_temp_cache[0]
+    try:
+        ps_cmd = (
+            "try{$t=(Get-WmiObject MSAcpi_ThermalZoneTemperature"
+            " -Namespace root/wmi|Select-Object -First 1).CurrentTemperature;"
+            " [math]::Round($t/10-273.15,1)}catch{-1}"
+        )
+        r = subprocess.run(
+            [_PS, "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
+            capture_output=True, text=True, timeout=4,
+            creationflags=0x08000000)
+        val = float(r.stdout.strip())
+        if 0 < val < 150:
+            _win_temp_cache[0] = val
+            _win_temp_cache[1] = now
+            return val
+    except Exception:
+        pass
+    return -1.0
 
 # ── Scrollable Frame helper ───────────────────────────────────────────────────
 class ScrollFrame(tk.Frame):
@@ -275,6 +361,8 @@ def collect_sysinfo():
     def S(title): out.append(("__section__", title, "", ""))
     def R(label, value, color=T1): out.append(("row", label, value, color))
 
+    _load_hw_cache()  # one PowerShell call — fills cache for all hw queries below
+
     S("SISTEM OPERARE")
     R("OS",          platform.system() + " " + platform.release())
     R("Versiune",    platform.version()[:60])
@@ -298,6 +386,9 @@ def collect_sysinfo():
         R("Utilizare", f"{usage:.1f}%", color)
 
     S("MEMORIE (RAM)")
+    ram_modules = _get_ram_modules()
+    for i, mod in enumerate(ram_modules):
+        R(f"Modul {i}", mod[:65], CYAN)
     if HAS_PSUTIL:
         vm = psutil.virtual_memory()
         pct_c = RED if vm.percent > 90 else ORANGE if vm.percent > 70 else GREEN
@@ -378,7 +469,9 @@ def collect_sysinfo():
 
 
 # ── Benchmark functions ───────────────────────────────────────────────────────
-REF = dict(single=1800.0, integer=1200.0, multi=400.0, memory=1200.0, storage=1800.0)
+# Reference times calibrated for a mid-range desktop (AMD Ryzen 5 / Intel i5 class)
+REF = dict(single=3500.0, integer=2200.0, multi=900.0, memory=800.0, storage=1800.0)
+REF_GPU_FPS = 12.0  # reference FPS for PIL render benchmark
 
 def _score(key, ms):
     return clamp(int((REF[key] / max(ms, 1)) * 5000), 1, MAX_SCORE)
@@ -405,40 +498,81 @@ def bench_integer(prog):
     return _score("integer", ms), f"{mops:.0f} Mops/s • {ms:.0f} ms"
 
 def bench_multi(prog):
-    prog(5); cores = os.cpu_count() or 2; ipc = 60_000_000 // cores
-    lock = threading.Lock(); progress = [0]
-    def worker(_):
-        r = 0.0; step = max(ipc//10, 1)
-        for i in range(ipc):
-            r += math.sin(i)*math.cos(i)+math.sqrt(i+1.0)
-            if i % step == 0:
-                with lock:
-                    progress[0] += 1
-                    prog(int(5 + progress[0]/(cores*10)*90))
-        return r
+    prog(5)
+    cores = os.cpu_count() or 2
+    ipc = 60_000_000 // cores
     t = time.perf_counter()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=cores) as ex:
-        list(ex.map(worker, range(cores)))
+    # ProcessPoolExecutor bypasses the GIL — true parallel execution on all cores
+    with concurrent.futures.ProcessPoolExecutor(max_workers=cores) as ex:
+        futs = [ex.submit(_bench_cpu_worker_fn, ipc) for _ in range(cores)]
+        done = 0
+        for f in concurrent.futures.as_completed(futs):
+            done += 1
+            prog(int(5 + done / cores * 90))
     ms = (time.perf_counter()-t)*1000; prog(100)
     return _score("multi", ms), f"{cores} nuclee • {ms:.0f} ms"
 
 def bench_memory(prog):
-    prog(5); size = 16_000_000; passes = 4; arr = [0]*size
+    prog(5)
+    if HAS_PSUTIL:
+        avail = psutil.virtual_memory().available
+        target = max(256 << 20, min(int(avail * 0.30), 1 << 30))  # 30% of free RAM, max 1 GB
+    else:
+        target = 512 << 20
+    prog(8)
+    try:
+        buf = bytearray(target)
+    except MemoryError:
+        target = 256 << 20
+        buf = bytearray(target)
+    mv = memoryview(buf)
+    pattern = bytes([0xAB, 0xCD, 0xEF, 0x01] * 16384)  # 64 KB pattern
     t = time.perf_counter()
-    for p in range(passes):
-        for i in range(size): arr[i] = (i*2654435761)&0xFFFFFFFF
-        prog(5+(p+1)*8)
-    s = 0
-    for p in range(passes):
-        for i in range(size): s += arr[i]
-        prog(37+(p+1)*8)
-    rng = random.Random(42)
-    for p in range(passes):
-        for _ in range(size//8): idx=rng.randint(0,size-1); arr[idx]^=idx
-        prog(69+(p+1)*7)
-    ms = (time.perf_counter()-t)*1000; prog(100)
-    bw = (size*4*passes*2+(size//8)*4*passes)/(ms/1000)/(1<<20)
-    return _score("memory", ms), f"{bw:.0f} MB/s • {ms:.0f} ms"
+    # Sequential write via C-level memcpy (fast)
+    chunk = len(pattern)
+    for off in range(0, target, chunk):
+        sz = min(chunk, target - off)
+        mv[off:off+sz] = pattern[:sz]
+        prog(8 + int(off/target * 44))
+    # Sequential read — stride every 64 bytes (cache line)
+    chk = sum(mv[::64])
+    prog(90)
+    ms = (time.perf_counter()-t)*1000
+    del buf; prog(100)
+    bw = target * 2 / (ms/1000) / (1<<20)
+    return _score("memory", ms), f"{target>>20} MB • {bw:.0f} MB/s • {ms:.0f} ms"
+
+def bench_gpu(prog):
+    prog(5)
+    if not HAS_PIL:
+        return 0, "PIL nedisponibil — test sărit"
+    from PIL import Image, ImageDraw, ImageFilter
+    W, H = 1920, 1080
+    frames = 0; duration = 5.0
+    t_start = time.perf_counter()
+    prog(10)
+    while time.perf_counter() - t_start < duration:
+        el = time.perf_counter() - t_start
+        img = Image.new("RGB", (W, H), (8, 8, 18))
+        draw = ImageDraw.Draw(img)
+        for i in range(80):
+            a = el * 1.5 + i * (math.pi * 2 / 80)
+            x = int(W/2 + W/3 * math.cos(a))
+            y = int(H/2 + H/3 * math.sin(a * 1.3))
+            r = int(22 + 12 * math.sin(el * 2 + i))
+            col = (
+                int(128 + 127 * math.cos(el + i * 0.3)),
+                int(128 + 127 * math.sin(el * 2 + i * 0.5)),
+                int(200 - 100 * math.cos(el + i)),
+            )
+            draw.ellipse([x-r, y-r, x+r, y+r], fill=col)
+        img = img.filter(ImageFilter.GaussianBlur(radius=3))
+        frames += 1
+        prog(min(10 + int(el/duration * 85), 95))
+    ms = (time.perf_counter()-t_start)*1000; prog(100)
+    fps = frames / (ms/1000)
+    score = clamp(int(fps / REF_GPU_FPS * 5000), 1, MAX_SCORE)
+    return score, f"{fps:.1f} FPS • {frames} frame-uri • PIL Render"
 
 def bench_storage(prog):
     prog(5); block=4096; blocks=4096; buf=bytes(range(256))*(block//256)
@@ -522,19 +656,31 @@ class StressEngine:
             with self._lock: self._iters += 500_000
 
     def _mem(self):
+        chunk_size = 64 << 20  # 64 MB per chunk
+        if HAS_PSUTIL:
+            avail_mb = psutil.virtual_memory().available >> 20
+            max_chunks = max(4, int(avail_mb * 0.70 / 64))
+        else:
+            max_chunks = 64  # 4 GB fallback cap
+        pattern = bytes([0xAA, 0xBB, 0xCC, 0xDD] * 1024)  # 4 KB pattern
         while self._running.is_set():
             try:
-                c = bytearray(1<<20)
-                for i in range(0, len(c), 64): c[i] = i%256
+                c = bytearray(chunk_size)
+                # Touch every page to ensure physical RAM allocation
+                mv = memoryview(c)
+                for off in range(0, chunk_size, 4096):
+                    mv[off:off+4] = b'\xAA\xBB\xCC\xDD'
                 with self._lock:
-                    if len(self._chunks) >= 128: self._chunks.pop(0)
+                    if len(self._chunks) >= max_chunks:
+                        self._chunks.pop(0)
                     self._chunks.append(c)
-                    self._iters += len(c)
-                time.sleep(0.01)
+                    self._iters += chunk_size
+                time.sleep(0.05)
             except MemoryError:
                 with self._lock:
-                    del self._chunks[:len(self._chunks)//2]
-                time.sleep(0.2)
+                    if self._chunks:
+                        del self._chunks[:max(1, len(self._chunks)//2)]
+                time.sleep(1.0)
 
     def _monitor(self, n_threads, duration, on_stats, on_done):
         t0 = time.time(); prev_i = 0; prev_cpu = self._cpu_times()
@@ -564,15 +710,18 @@ class StressEngine:
         return clamp(int((1-di/max(dt,1))*100), 0, 100)
 
     def _temp(self):
-        if not HAS_PSUTIL: return -1.0
-        try:
-            temps = psutil.sensors_temperatures()
-            for k in ("coretemp","k10temp","acpitz","cpu_thermal"):
-                if k in temps: return temps[k][0].current
-            for v in temps.values():
-                if v: return v[0].current
-        except Exception: pass
-        return -1.0
+        if HAS_PSUTIL:
+            try:
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for k in ("coretemp","k10temp","acpitz","cpu_thermal"):
+                        if k in temps: return temps[k][0].current
+                    for v in temps.values():
+                        if v: return v[0].current
+            except Exception:
+                pass
+        # Windows fallback via WMI thermal zone
+        return _get_windows_temp()
 
 
 # ── Main App ──────────────────────────────────────────────────────────────────
@@ -583,6 +732,14 @@ class App(tk.Tk):
         self.configure(bg=BG)
         self.geometry("860x680")
         self.minsize(700, 520)
+
+        # Set window + taskbar icon
+        icon_path = Path(__file__).parent / "zf_icon.ico"
+        if icon_path.exists():
+            try:
+                self.iconbitmap(str(icon_path))
+            except Exception:
+                pass
 
         self._stress = StressEngine()
         self._bench_running = False
@@ -679,6 +836,8 @@ class App(tk.Tk):
         return root
 
     def _load_sysinfo(self):
+        global _HW_CACHE
+        _HW_CACHE = None  # reset so PowerShell re-runs on manual refresh
         data = collect_sysinfo()
         self.after(0, lambda: self._render_sysinfo(data))
 
@@ -731,11 +890,12 @@ class App(tk.Tk):
 
         # Test rows
         TESTS = [
-            ("CPU SINGLE-CORE",  "Operații trigonometrice (FP)",          GREEN,  "single"),
-            ("CPU INTEGER",      "Operații întregi, XOR, rotații bit",    CYAN,   "integer"),
-            ("CPU MULTI-CORE",   "Calcule paralele pe toate nucleele",    ORANGE, "multi"),
-            ("MEMORIE",          "Bandwidth RAM: write / read / random",  PURPLE, "memory"),
-            ("STOCARE I/O",      "Citire + scriere fișier 16 MB",         YELLOW, "storage"),
+            ("CPU SINGLE-CORE",  "Operații trigonometrice (FP)",           GREEN,  "single"),
+            ("CPU INTEGER",      "Operații întregi, XOR, rotații bit",     CYAN,   "integer"),
+            ("CPU MULTI-CORE",   "Calcule paralele pe toate nucleele",     ORANGE, "multi"),
+            ("MEMORIE",          "Bandwidth RAM: write / read (30% RAM)",  PURPLE, "memory"),
+            ("STOCARE I/O",      "Citire + scriere fișier 16 MB",          YELLOW, "storage"),
+            ("GPU / RENDER",     "PIL render 1080p: cercuri + blur (5s)",  RED,    "gpu"),
         ]
         self._bench_w = {}
         for title, sub, color, key in TESTS:
@@ -781,6 +941,7 @@ class App(tk.Tk):
             ("multi",   bench_multi,   ORANGE),
             ("memory",  bench_memory,  PURPLE),
             ("storage", bench_storage, YELLOW),
+            ("gpu",     bench_gpu,     RED),
         ]
         scores = {}
         for key, fn, color in FUNS:
@@ -885,8 +1046,9 @@ class App(tk.Tk):
                                   font=("Courier New", 16, "bold"))
         self._thr_lbl.pack(side="right")
 
-        self._thr_var = tk.IntVar(value=os.cpu_count() or 4)
-        scale = tk.Scale(tc, from_=1, to=32, orient="horizontal",
+        max_threads = os.cpu_count() or 8
+        self._thr_var = tk.IntVar(value=max_threads)
+        scale = tk.Scale(tc, from_=1, to=max_threads, orient="horizontal",
                          variable=self._thr_var,
                          command=lambda v: self._thr_lbl.config(text=v),
                          bg=CARD, fg=T1, troughcolor=ELEV,

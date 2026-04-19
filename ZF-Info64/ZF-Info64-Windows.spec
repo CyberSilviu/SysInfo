@@ -6,6 +6,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('logo ZF-Logo64.png', '.'),
+        ('zf_icon.ico', '.'),
     ],
     hiddenimports=['psutil', 'PIL', 'PIL.Image', 'PIL.ImageTk',
                    'urllib', 'urllib.parse', 'urllib.request', 'urllib.response',

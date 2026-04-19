@@ -23,7 +23,7 @@
     <color name="text_secondary">#FF8B949E</color>
     <color name="text_tertiary">#FF484F58</color>
     <color name="white">#FFFFFFFF</color>
-    <string name="app_name">SysInfo Pro</string>
+    <string name="app_name">ZF-INFO64</string>
     <string name="bench_cpu_multi">CPU Multi-Core</string>
     <string name="bench_cpu_single">CPU Single-Core</string>
     <string name="bench_memory">Memorie</string>

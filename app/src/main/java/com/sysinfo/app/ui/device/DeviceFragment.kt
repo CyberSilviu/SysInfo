@@ -52,6 +52,12 @@ class DeviceFragment : Fragment() {
             DeviceInfoCollector.getCpuInfo()
         )
 
+        // GPU info
+        populateSection(
+            view.findViewById(R.id.gpuInfoContainer),
+            DeviceInfoCollector.getGpuInfo(ctx)
+        )
+
         // Memory info
         populateSection(
             view.findViewById(R.id.memInfoContainer),

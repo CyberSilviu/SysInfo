@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">SysInfo Pro</string>
+    <string name="app_name">ZF-INFO64</string>
 
     <!-- Navigation -->
     <string name="nav_device">Dispozitiv</string>

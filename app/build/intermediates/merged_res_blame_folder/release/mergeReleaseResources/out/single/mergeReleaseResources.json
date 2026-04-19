@@ -1,138 +1,134 @@
 [
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xxxhdpi/ic_launcher_round.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_item_info_row.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\item_info_row.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_btn_accent.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\btn_accent.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_btn_red.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\btn_red.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-mdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-mdpi\\ic_launcher_foreground.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-mdpi_ic_launcher_round.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-mdpi/ic_launcher_round.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_bg_card_elevated.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\bg_card_elevated.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-hdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-hdpi\\ic_launcher.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_zf_logo.png.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\zf_logo.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_ic_launcher_foreground.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\ic_launcher_foreground.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xhdpi_ic_launcher_round.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xhdpi/ic_launcher_round.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_zf_logo.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\zf_logo.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xxhdpi_ic_launcher_round.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xxhdpi/ic_launcher_round.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_bg_card_rounded.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\bg_card_rounded.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-mdpi_ic_launcher.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-mdpi/ic_launcher.png"
+        "merged": "com.sysinfo.app-release-49:/layout_fragment_device.xml.flat",
+        "source": "com.sysinfo.app-main-50:/layout/fragment_device.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-anydpi-v26/ic_launcher_round.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxhdpi\\ic_launcher_round.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_fragment_benchmark.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_benchmark.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\menu_bottom_nav_menu.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\menu\\bottom_nav_menu.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-hdpi_ic_launcher_foreground.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-hdpi/ic_launcher_foreground.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-mdpi\\ic_launcher_round.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_fragment_device.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_device.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-hdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-hdpi\\ic_launcher_foreground.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xxxhdpi_ic_launcher_foreground.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xxxhdpi/ic_launcher_foreground.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxhdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxhdpi\\ic_launcher_foreground.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xxhdpi_ic_launcher.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xxhdpi/ic_launcher.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xhdpi\\ic_launcher_round.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xxhdpi_ic_launcher_foreground.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xxhdpi/ic_launcher_foreground.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxhdpi\\ic_launcher.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_fragment_stress_test.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_stress_test.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_fragment_benchmark.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_benchmark.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\menu_bottom_nav_menu.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\menu\\bottom_nav_menu.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_activity_main.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\activity_main.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-hdpi_ic_launcher_round.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-hdpi/ic_launcher_round.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_fragment_device.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_device.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_progress_bar_green.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\progress_bar_green.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxxhdpi\\ic_launcher_round.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-anydpi-v26\\ic_launcher.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_btn_red.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\btn_red.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-mdpi_ic_launcher_foreground.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-mdpi/ic_launcher_foreground.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-mdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-mdpi\\ic_launcher.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-hdpi_ic_launcher.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-hdpi/ic_launcher.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxxhdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxxhdpi\\ic_launcher_foreground.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_ic_launcher_foreground.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\ic_launcher_foreground.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xhdpi_ic_launcher_foreground.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xhdpi\\ic_launcher_foreground.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_progress_bar_cyan.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\progress_bar_cyan.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xhdpi\\ic_launcher.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_activity_main.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\activity_main.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-hdpi\\ic_launcher_round.png"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_bg_card_rounded.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\bg_card_rounded.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxxhdpi\\ic_launcher.png"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_fragment_stress_test.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_stress_test.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xhdpi_ic_launcher_foreground.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xhdpi/ic_launcher_foreground.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_progress_bar_green.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\progress_bar_green.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\layout_item_info_row.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\item_info_row.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_btn_accent.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\btn_accent.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\color_bottom_nav_colors.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\color\\bottom_nav_colors.xml"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-anydpi-v26\\ic_launcher.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xhdpi_ic_launcher.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xhdpi/ic_launcher.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_progress_bar_cyan.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\progress_bar_cyan.xml"
     },
     {
-        "merged": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_bg_card_elevated.xml.flat",
-        "source": "C:\\Users\\silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\bg_card_elevated.xml"
-    },
-    {
-        "merged": "com.sysinfo.app-release-49:/mipmap-xxxhdpi_ic_launcher.png.flat",
-        "source": "com.sysinfo.app-main-50:/mipmap-xxxhdpi/ic_launcher.png"
+        "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\color_bottom_nav_colors.xml.flat",
+        "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\color\\bottom_nav_colors.xml"
     }
 ]
