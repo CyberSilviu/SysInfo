@@ -13,7 +13,7 @@ import kotlin.math.*
  */
 class StressTestEngine {
 
-    enum class StressType { CPU, MEMORY, MIXED }
+    enum class StressType { CPU, MEMORY, MIXED, GPU, MIXED_ALL }
 
     data class StressStats(
         val elapsedSeconds: Int,
@@ -25,10 +25,12 @@ class StressTestEngine {
         val memoryAllocatedMB: Int
     )
 
-    private val isRunning      = AtomicBoolean(false)
+    private val isRunning         = AtomicBoolean(false)
     private val activeThreadCount = AtomicInteger(0)
-    private val totalIterations   = AtomicLong(0)
+    val totalIterations           = AtomicLong(0)   // public so GLSurfaceView can increment it
     private var stressJob: Job?   = null
+
+    fun reportGpuFrame() { totalIterations.incrementAndGet() }
 
     // CPU stat snapshot for delta calculations
     private data class CpuStat(val idle: Long, val total: Long)
@@ -60,10 +62,16 @@ class StressTestEngine {
                     activeThreadCount.incrementAndGet()
                     try {
                         when (type) {
-                            StressType.CPU    -> cpuWorker()
-                            StressType.MEMORY -> memoryWorker(memChunks)
-                            StressType.MIXED  ->
+                            StressType.CPU       -> cpuWorker()
+                            StressType.MEMORY    -> memoryWorker(memChunks)
+                            StressType.GPU       -> gpuWorker()
+                            StressType.MIXED     ->
                                 if (idx % 2 == 0) cpuWorker() else memoryWorker(memChunks)
+                            StressType.MIXED_ALL -> when (idx % 3) {
+                                0    -> cpuWorker()
+                                1    -> memoryWorker(memChunks)
+                                else -> gpuWorker()
+                            }
                         }
                     } finally {
                         activeThreadCount.decrementAndGet()
@@ -177,6 +185,12 @@ class StressTestEngine {
             }
             yield()
         }
+    }
+
+    private suspend fun gpuWorker() {
+        // Real GPU rendering is handled by GpuStressRenderer on the GL thread.
+        // This coroutine just stays alive while the GLSurfaceView renders.
+        while (isRunning.get()) { delay(200) }
     }
 
     // ── CPU stat helpers ─────────────────────────────────────────────────────

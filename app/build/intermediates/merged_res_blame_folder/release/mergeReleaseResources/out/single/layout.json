@@ -8,12 +8,12 @@
         "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_device.xml"
     },
     {
-        "merged": "com.sysinfo.app-mergeReleaseResources-48:/layout/fragment_device.xml",
-        "source": "com.sysinfo.app-main-50:/layout/fragment_device.xml"
-    },
-    {
         "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-mergeReleaseResources-48:\\layout\\fragment_benchmark.xml",
         "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\layout\\fragment_benchmark.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-mergeReleaseResources-48:/layout/fragment_stress_test.xml",
+        "source": "com.sysinfo.app-main-50:/layout/fragment_stress_test.xml"
     },
     {
         "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-mergeReleaseResources-48:\\layout\\fragment_stress_test.xml",

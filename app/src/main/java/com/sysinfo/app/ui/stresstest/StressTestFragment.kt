@@ -1,5 +1,6 @@
 package com.sysinfo.app.ui.stresstest
 
+import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -17,8 +18,11 @@ import com.sysinfo.app.utils.StressTestEngine
 class StressTestFragment : Fragment() {
 
     private val stressEngine = StressTestEngine()
-    private var selectedDurationSeconds = 60 // default 1 min
+    private var selectedDurationSeconds = 60
     private var selectedThreads = 4
+    private var glSurfaceView: GLSurfaceView? = null
+    private var gpuRenderer: GpuStressRenderer? = null
+    private var gpuActive = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -33,19 +37,59 @@ class StressTestFragment : Fragment() {
         setupControls(view)
     }
 
+    override fun onResume() {
+        super.onResume()
+        glSurfaceView?.onResume()  // always resume GL thread so surface is ready
+    }
+
+    override fun onPause() {
+        super.onPause()
+        glSurfaceView?.onPause()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        stopGpuSurface()
         stressEngine.stop()
+        glSurfaceView = null
+    }
+
+    private fun setupGlSurface(view: View) {
+        val sv = view.findViewById<GLSurfaceView>(R.id.gpuSurface)
+        sv.setEGLContextClientVersion(2)
+        val renderer = GpuStressRenderer(stressEngine.totalIterations)
+        sv.setRenderer(renderer)
+        sv.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY  // start paused
+        glSurfaceView = sv
+        gpuRenderer   = renderer
+    }
+
+    private fun startGpuSurface() {
+        glSurfaceView?.let {
+            it.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            it.visibility = View.VISIBLE
+            gpuActive = true
+        }
+    }
+
+    private fun stopGpuSurface() {
+        glSurfaceView?.let {
+            it.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+            it.visibility = View.INVISIBLE
+        }
+        gpuActive = false
     }
 
     private fun setupControls(view: View) {
+        setupGlSurface(view)
         val btnStart = view.findViewById<MaterialButton>(R.id.btnStartStress)
         val tvThreadCount = view.findViewById<TextView>(R.id.tvThreadCount)
         val seekThreads = view.findViewById<SeekBar>(R.id.seekThreads)
 
-        // Set default thread count to number of cores
+        // Set default and max thread count to number of CPU cores
         val defaultThreads = Runtime.getRuntime().availableProcessors()
         selectedThreads = defaultThreads
+        seekThreads.max = defaultThreads
         seekThreads.progress = defaultThreads
         tvThreadCount.text = "$defaultThreads"
 
@@ -93,10 +137,12 @@ class StressTestFragment : Fragment() {
 
         // Determine stress type
         val stressType = when (rgType.checkedRadioButtonId) {
-            R.id.rbCpuStress -> StressTestEngine.StressType.CPU
-            R.id.rbMemoryStress -> StressTestEngine.StressType.MEMORY
-            R.id.rbMixedStress -> StressTestEngine.StressType.MIXED
-            else -> StressTestEngine.StressType.CPU
+            R.id.rbCpuStress      -> StressTestEngine.StressType.CPU
+            R.id.rbMemoryStress   -> StressTestEngine.StressType.MEMORY
+            R.id.rbMixedStress    -> StressTestEngine.StressType.MIXED
+            R.id.rbGpuStress      -> StressTestEngine.StressType.GPU
+            R.id.rbMixedAllStress -> StressTestEngine.StressType.MIXED_ALL
+            else                  -> StressTestEngine.StressType.CPU
         }
 
         // Update UI
@@ -107,6 +153,12 @@ class StressTestFragment : Fragment() {
 
         val durationText = if (selectedDurationSeconds > 0) "${selectedDurationSeconds}s" else "∞"
         tvLog.append("▶ Start ${stressType.name} • ${selectedThreads} threads • $durationText\n")
+
+        // Start GPU surface when needed
+        if (stressType == StressTestEngine.StressType.GPU ||
+            stressType == StressTestEngine.StressType.MIXED_ALL) {
+            startGpuSurface()
+        }
 
         // Start engine
         stressEngine.start(
@@ -119,6 +171,7 @@ class StressTestFragment : Fragment() {
             },
             onComplete = { summary ->
                 tvLog.append("✓ $summary\n\n")
+                stopGpuSurface()
                 resetButton(view)
             }
         )
@@ -126,6 +179,7 @@ class StressTestFragment : Fragment() {
 
     private fun stopStressTest(view: View) {
         stressEngine.stop()
+        stopGpuSurface()
         val tvLog = view.findViewById<TextView>(R.id.tvStressLog)
         tvLog.append("■ Test oprit manual.\n\n")
         resetButton(view)

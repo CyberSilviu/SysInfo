@@ -232,6 +232,15 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- GPU OpenGL Surface — INVISIBLE until GPU stress starts, then VISIBLE -->
+        <android.opengl.GLSurfaceView
+            android:id="@+id/gpuSurface"
+            android:layout_width="match_parent"
+            android:layout_height="180dp"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="invisible" />
+
         <!-- Test Type Selection -->
         <LinearLayout
             style="@style/InfoCard"
@@ -285,6 +294,26 @@
                     android:textColor="@color/text_primary"
                     android:textSize="13sp"
                     android:buttonTint="@color/accent_cyan"
+                    android:paddingVertical="6dp" />
+
+                <RadioButton
+                    android:id="@+id/rbGpuStress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="GPU Stress — rendering 2D intensiv 1080p"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:buttonTint="@color/accent_red"
+                    android:paddingVertical="6dp" />
+
+                <RadioButton
+                    android:id="@+id/rbMixedAllStress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Mixed All — CPU + Memorie + GPU"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    android:buttonTint="@color/accent_orange"
                     android:paddingVertical="6dp" />
             </RadioGroup>
         </LinearLayout>

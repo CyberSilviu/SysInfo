@@ -3370,6 +3370,7 @@ id ghost_view
 id ghost_view_holder
 id gone
 id gpuInfoContainer
+id gpuSurface
 id graph
 id graph_wrap
 id group_divider
@@ -3543,7 +3544,9 @@ id progress_horizontal
 id radio
 id ratio
 id rbCpuStress
+id rbGpuStress
 id rbMemoryStress
+id rbMixedAllStress
 id rbMixedStress
 id rectangles
 id report_drawn
@@ -4118,8 +4121,10 @@ string side_sheet_behavior
 string status_bar_notification_info_overflow
 string stress_cpu
 string stress_duration
+string stress_gpu
 string stress_memory
 string stress_mixed
+string stress_mixed_all
 string stress_status_done
 string stress_status_idle
 string stress_status_running

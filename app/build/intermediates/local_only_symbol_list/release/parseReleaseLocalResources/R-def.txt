@@ -47,6 +47,7 @@ id cpuInfoContainer
 id deviceFragment
 id displayInfoContainer
 id gpuInfoContainer
+id gpuSurface
 id header
 id headerDivider
 id memInfoContainer
@@ -59,7 +60,9 @@ id progressMulti
 id progressSingle
 id progressStorage
 id rbCpuStress
+id rbGpuStress
 id rbMemoryStress
+id rbMixedAllStress
 id rbMixedStress
 id rgStressType
 id seekThreads
@@ -128,8 +131,10 @@ string section_storage
 string section_system
 string stress_cpu
 string stress_duration
+string stress_gpu
 string stress_memory
 string stress_mixed
+string stress_mixed_all
 string stress_status_done
 string stress_status_idle
 string stress_status_running

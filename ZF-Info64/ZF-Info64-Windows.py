@@ -21,6 +21,12 @@ except ImportError:
 
 import platform, concurrent.futures, tempfile, subprocess, multiprocessing
 
+def _resource_path(name):
+    """Resolve a bundled resource path for both script and PyInstaller frozen modes."""
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS) / name
+    return Path(__file__).parent / name
+
 # ── Palette ───────────────────────────────────────────────────────────────────
 BG       = "#0D1117"
 BG2      = "#161B22"
@@ -618,8 +624,20 @@ class StressEngine:
         if self._running.is_set(): return
         self._running.set(); self._iters = 0; self._chunks.clear()
 
-        cpu_count = n_threads if stype == "CPU" else (n_threads // 2 if stype == "MIXED" else 0)
-        mem_count = n_threads if stype == "MEM" else (n_threads - n_threads // 2 if stype == "MIXED" else 0)
+        if stype == "CPU":
+            cpu_count, mem_count, gpu_count = n_threads, 0, 0
+        elif stype == "MEM":
+            cpu_count, mem_count, gpu_count = 0, n_threads, 0
+        elif stype == "GPU":
+            cpu_count, mem_count, gpu_count = 0, 0, n_threads
+        elif stype == "MIXED":
+            cpu_count = n_threads // 2
+            mem_count = n_threads - cpu_count
+            gpu_count = 0
+        else:  # MIXED_ALL
+            cpu_count = max(1, n_threads // 3)
+            gpu_count = max(1, n_threads // 3)
+            mem_count = n_threads - cpu_count - gpu_count
 
         for _ in range(cpu_count):
             p = multiprocessing.Process(target=_cpu_stress_worker_fn, daemon=True)
@@ -628,6 +646,9 @@ class StressEngine:
 
         for _ in range(mem_count):
             threading.Thread(target=self._mem, daemon=True).start()
+
+        for _ in range(gpu_count):
+            threading.Thread(target=self._gpu, daemon=True).start()
 
         threading.Thread(target=self._monitor,
                          args=(n_threads, duration, on_stats, on_done),
@@ -682,6 +703,150 @@ class StressEngine:
                         del self._chunks[:max(1, len(self._chunks)//2)]
                 time.sleep(1.0)
 
+    def _gpu(self):
+        """GPU stress via opengl32.dll (ctypes, always present on Windows).
+        Creates a 1×1 hidden window with an OpenGL context and renders
+        thousands of triangles per frame — actual GPU 3D utilisation."""
+        try:
+            self._gpu_opengl()
+        except Exception:
+            pass  # GPU stress unavailable on this machine
+
+    def _gpu_opengl(self):
+        import ctypes, ctypes.wintypes as wt
+
+        gl   = ctypes.WinDLL("opengl32")
+        gdi  = ctypes.windll.gdi32
+        user = ctypes.windll.user32
+        k32  = ctypes.windll.kernel32
+
+        class PIXELFORMATDESCRIPTOR(ctypes.Structure):
+            _fields_ = [
+                ("nSize", wt.WORD), ("nVersion", wt.WORD), ("dwFlags", wt.DWORD),
+                ("iPixelType", ctypes.c_ubyte), ("cColorBits", ctypes.c_ubyte),
+                ("cRedBits",   ctypes.c_ubyte), ("cRedShift",   ctypes.c_ubyte),
+                ("cGreenBits", ctypes.c_ubyte), ("cGreenShift", ctypes.c_ubyte),
+                ("cBlueBits",  ctypes.c_ubyte), ("cBlueShift",  ctypes.c_ubyte),
+                ("cAlphaBits", ctypes.c_ubyte), ("cAlphaShift", ctypes.c_ubyte),
+                ("cAccumBits", ctypes.c_ubyte), ("cAccumRedBits", ctypes.c_ubyte),
+                ("cAccumGreenBits", ctypes.c_ubyte), ("cAccumBlueBits", ctypes.c_ubyte),
+                ("cAccumAlphaBits", ctypes.c_ubyte), ("cDepthBits", ctypes.c_ubyte),
+                ("cStencilBits", ctypes.c_ubyte), ("cAuxBuffers", ctypes.c_ubyte),
+                ("iLayerType", ctypes.c_ubyte), ("bReserved", ctypes.c_ubyte),
+                ("dwLayerMask", wt.DWORD), ("dwVisibleMask", wt.DWORD),
+                ("dwDamageMask", wt.DWORD),
+            ]
+
+        WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong,
+                                     wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+        _proc = WNDPROC(lambda h, m, w, l: user.DefWindowProcW(h, m, w, l))
+
+        class WNDCLASSW(ctypes.Structure):
+            _fields_ = [
+                ("style", wt.UINT), ("lpfnWndProc", WNDPROC),
+                ("cbClsExtra", ctypes.c_int), ("cbWndExtra", ctypes.c_int),
+                ("hInstance", wt.HINSTANCE), ("hIcon", wt.HANDLE),
+                ("hCursor", wt.HANDLE), ("hbrBackground", wt.HBRUSH),
+                ("lpszMenuName", wt.LPCWSTR), ("lpszClassName", wt.LPCWSTR),
+            ]
+
+        hinstance  = k32.GetModuleHandleW(None)
+        class_name = "ZFGLStress"
+        wc = WNDCLASSW()
+        wc.lpfnWndProc   = _proc
+        wc.hInstance     = hinstance
+        wc.lpszClassName = class_name
+        user.RegisterClassW(ctypes.byref(wc))
+
+        # Large visible window — GPU needs real screen pixels to show utilisation
+        W, H = 1280, 720
+        sw = user.GetSystemMetrics(0)   # screen width
+        sh = user.GetSystemMetrics(1)   # screen height
+        hwnd = user.CreateWindowExW(
+            0x00000080,                             # WS_EX_TOOLWINDOW
+            class_name, "ZF-Info64 GPU Stress",
+            0x80000000 | 0x10000000,                # WS_POPUP | WS_VISIBLE
+            (sw - W) // 2, (sh - H) // 2, W, H,
+            None, None, hinstance, None)
+        if not hwnd:
+            raise RuntimeError("CreateWindowEx failed")
+        user.ShowWindow(hwnd, 1)
+
+        hdc = user.GetDC(hwnd)
+        pfd = PIXELFORMATDESCRIPTOR()
+        pfd.nSize     = ctypes.sizeof(PIXELFORMATDESCRIPTOR)
+        pfd.nVersion  = 1
+        pfd.dwFlags   = 4 | 32 | 1   # DRAW_TO_WINDOW | SUPPORT_OPENGL | DOUBLEBUFFER
+        pfd.cColorBits = 32
+        pfd.cDepthBits = 24
+        pf = gdi.ChoosePixelFormat(hdc, ctypes.byref(pfd))
+        gdi.SetPixelFormat(hdc, pf, ctypes.byref(pfd))
+
+        hglrc = gl.wglCreateContext(hdc)
+        gl.wglMakeCurrent(hdc, hglrc)
+
+        # Disable VSync via wglSwapIntervalEXT so GPU runs at max throughput
+        gl.wglGetProcAddress.restype  = ctypes.c_void_p
+        gl.wglGetProcAddress.argtypes = [ctypes.c_char_p]
+        addr = gl.wglGetProcAddress(b"wglSwapIntervalEXT")
+        if addr:
+            SwapInterval = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int)(addr)
+            SwapInterval(0)
+
+        # Full-screen quad (two triangles, NDC coords)
+        quad = (ctypes.c_float * 12)(
+            -1.0, -1.0,   1.0, -1.0,  -1.0,  1.0,
+             1.0, -1.0,   1.0,  1.0,  -1.0,  1.0
+        )
+
+        GL_FLOAT               = 0x1406
+        GL_TRIANGLES           = 0x0004
+        GL_COLOR_BUFFER_BIT    = 0x00004000
+        GL_VERTEX_ARRAY        = 0x8074
+        GL_BLEND               = 0x0BE2
+        GL_SRC_ALPHA           = 0x0302
+        GL_ONE_MINUS_SRC_ALPHA = 0x0303
+
+        gl.glEnableClientState.argtypes = [ctypes.c_uint]
+        gl.glEnable.argtypes            = [ctypes.c_uint]
+        gl.glBlendFunc.argtypes         = [ctypes.c_uint, ctypes.c_uint]
+        gl.glVertexPointer.argtypes     = [ctypes.c_int, ctypes.c_uint,
+                                           ctypes.c_int, ctypes.c_void_p]
+        gl.glDrawArrays.argtypes        = [ctypes.c_uint, ctypes.c_int, ctypes.c_int]
+        gl.glClear.argtypes             = [ctypes.c_uint]
+        gl.glClearColor.argtypes        = [ctypes.c_float] * 4
+        gl.glColor4f.argtypes           = [ctypes.c_float] * 4
+        gl.glViewport.argtypes          = [ctypes.c_int] * 4
+
+        gl.glViewport(0, 0, W, H)
+        gl.glEnableClientState(GL_VERTEX_ARRAY)
+        gl.glVertexPointer(2, GL_FLOAT, 0, quad)
+        gl.glEnable(GL_BLEND)
+        gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        gl.glClearColor(0.031, 0.031, 0.071, 1.0)
+
+        # Key strategy: 5000 full-screen quad blended draws per frame.
+        # Python just calls glDrawArrays repeatedly — the GPU does all rasterisation.
+        # At 1280×720, each pass = 921 600 pixel blend ops → GPU fill-rate saturated.
+        PASSES = 5000
+        t = 0.0
+        while self._running.is_set():
+            gl.glClear(GL_COLOR_BUFFER_BIT)
+            # Rotate colour every frame — one ctypes call outside the hot loop
+            gl.glColor4f(abs(math.sin(t)), abs(math.cos(t*1.3)),
+                         abs(math.sin(t*0.7)), 0.003)
+            for _ in range(PASSES):
+                gl.glDrawArrays(GL_TRIANGLES, 0, 6)
+            gdi.SwapBuffers(hdc)
+            t += 0.01
+            with self._lock: self._iters += 1
+
+        gl.wglMakeCurrent(None, None)
+        gl.wglDeleteContext(hglrc)
+        user.ReleaseDC(hwnd, hdc)
+        user.DestroyWindow(hwnd)
+        user.UnregisterClassW(class_name, hinstance)
+
     def _monitor(self, n_threads, duration, on_stats, on_done):
         t0 = time.time(); prev_i = 0; prev_cpu = self._cpu_times()
         while self._running.is_set():
@@ -734,12 +899,20 @@ class App(tk.Tk):
         self.minsize(700, 520)
 
         # Set window + taskbar icon
-        icon_path = Path(__file__).parent / "zf_icon.ico"
+        icon_path = _resource_path("zf_icon.ico")
         if icon_path.exists():
             try:
-                self.iconbitmap(str(icon_path))
+                self.iconbitmap(default=str(icon_path))
             except Exception:
                 pass
+            if HAS_PIL:
+                try:
+                    from PIL import Image, ImageTk
+                    _img = Image.open(str(icon_path))
+                    self._icon_ref = ImageTk.PhotoImage(_img)
+                    self.iconphoto(True, self._icon_ref)
+                except Exception:
+                    pass
 
         self._stress = StressEngine()
         self._bench_running = False
@@ -770,7 +943,7 @@ class App(tk.Tk):
         hdr.pack(fill="x")
 
         # Logo
-        logo_path = Path(__file__).parent / "logo ZF-Logo64.png"
+        logo_path = _resource_path("logo ZF-Logo64.png")
         self._logo = None
         if logo_path.exists() and HAS_PIL:
             try:
@@ -1009,9 +1182,11 @@ class App(tk.Tk):
         cc = card(p)
         self._stress_type = tk.StringVar(value="CPU")
         for txt, val, c in [
-            ("CPU Stress — încărcare maximă pe toate nucleele",   "CPU",   GREEN),
-            ("Memory Stress — alocare/dealocare intensivă RAM",   "MEM",   PURPLE),
-            ("Mixed Stress — CPU + Memorie combinat",             "MIXED", CYAN),
+            ("CPU Stress — încărcare maximă pe toate nucleele",   "CPU",      GREEN),
+            ("Memory Stress — alocare/dealocare intensivă RAM",   "MEM",      PURPLE),
+            ("GPU Stress — rendering 2D intensiv 1080p (PIL)",    "GPU",      RED),
+            ("Mixed Stress — CPU + Memorie combinat",             "MIXED",    CYAN),
+            ("Mixed All — CPU + Memorie + GPU",                   "MIXED_ALL",ORANGE),
         ]:
             row = tk.Frame(cc, bg=CARD, pady=3)
             row.pack(fill="x")
@@ -1131,6 +1306,9 @@ class App(tk.Tk):
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     try: ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception: pass
+    # Set AppUserModelID so taskbar uses the correct icon instead of Python's
+    try: ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ZF.Info64.App")
     except Exception: pass
 
     app = App()

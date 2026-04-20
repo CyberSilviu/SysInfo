@@ -307,6 +307,7 @@
   ('ctypes', 'C:\\Python314\\Lib\\ctypes\\__init__.py', 'PYMODULE-1'),
   ('ctypes._endian', 'C:\\Python314\\Lib\\ctypes\\_endian.py', 'PYMODULE-1'),
   ('ctypes._layout', 'C:\\Python314\\Lib\\ctypes\\_layout.py', 'PYMODULE-1'),
+  ('ctypes.wintypes', 'C:\\Python314\\Lib\\ctypes\\wintypes.py', 'PYMODULE-1'),
   ('dataclasses', 'C:\\Python314\\Lib\\dataclasses.py', 'PYMODULE-1'),
   ('datetime', 'C:\\Python314\\Lib\\datetime.py', 'PYMODULE-1'),
   ('decimal', 'C:\\Python314\\Lib\\decimal.py', 'PYMODULE-1'),

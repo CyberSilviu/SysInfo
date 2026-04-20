@@ -32,10 +32,6 @@
         "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\bg_card_rounded.xml"
     },
     {
-        "merged": "com.sysinfo.app-release-49:/layout_fragment_device.xml.flat",
-        "source": "com.sysinfo.app-main-50:/layout/fragment_device.xml"
-    },
-    {
         "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\mipmap-xxhdpi_ic_launcher_round.png.flat",
         "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\mipmap-xxhdpi\\ic_launcher_round.png"
     },
@@ -114,6 +110,10 @@
     {
         "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_progress_bar_green.xml.flat",
         "source": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-main-50:\\drawable\\progress_bar_green.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-release-49:/layout_fragment_stress_test.xml.flat",
+        "source": "com.sysinfo.app-main-50:/layout/fragment_stress_test.xml"
     },
     {
         "merged": "C:\\Users\\Silviu\\.gradle\\daemon\\8.13\\com.sysinfo.app-release-49:\\drawable_btn_accent.xml.flat",

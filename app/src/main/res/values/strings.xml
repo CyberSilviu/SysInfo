@@ -32,6 +32,8 @@
     <string name="stress_cpu">CPU Stress</string>
     <string name="stress_memory">Memory Stress</string>
     <string name="stress_mixed">Mixed Stress</string>
+    <string name="stress_gpu">GPU Stress</string>
+    <string name="stress_mixed_all">Mixed All Stress</string>
     <string name="btn_start_stress">▶  START</string>
     <string name="btn_stop_stress">■  STOP</string>
     <string name="stress_duration">Durată</string>
