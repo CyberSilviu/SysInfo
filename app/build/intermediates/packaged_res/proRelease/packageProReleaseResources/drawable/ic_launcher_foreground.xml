@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- CPU chip body -->
+    <path
+        android:fillColor="#00D4FF"
+        android:pathData="M34,34 L74,34 Q78,34 78,38 L78,70 Q78,74 74,74 L34,74 Q30,74 30,70 L30,38 Q30,34 34,34 Z" />
+
+    <!-- Inner chip -->
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M40,40 L68,40 Q70,40 70,42 L70,66 Q70,68 68,68 L40,68 Q38,68 38,66 L38,42 Q38,40 40,40 Z" />
+
+    <!-- SYS text -->
+    <path
+        android:fillColor="#00D4FF"
+        android:pathData="M44,52 L48,52 L48,54 L44,54 Z M50,52 L54,52 L54,54 L50,54 Z M56,52 L60,52 L60,54 L56,54 Z M62,52 L66,52 L66,54 L62,54 Z" />
+
+    <!-- Pins top -->
+    <path android:fillColor="#00E676" android:pathData="M40,28 L42,28 L42,34 L40,34 Z" />
+    <path android:fillColor="#00E676" android:pathData="M48,28 L50,28 L50,34 L48,34 Z" />
+    <path android:fillColor="#00E676" android:pathData="M56,28 L58,28 L58,34 L56,34 Z" />
+    <path android:fillColor="#00E676" android:pathData="M64,28 L66,28 L66,34 L64,34 Z" />
+
+    <!-- Pins bottom -->
+    <path android:fillColor="#00E676" android:pathData="M40,74 L42,74 L42,80 L40,80 Z" />
+    <path android:fillColor="#00E676" android:pathData="M48,74 L50,74 L50,80 L48,80 Z" />
+    <path android:fillColor="#00E676" android:pathData="M56,74 L58,74 L58,80 L56,80 Z" />
+    <path android:fillColor="#00E676" android:pathData="M64,74 L66,74 L66,80 L64,80 Z" />
+
+    <!-- Pins left -->
+    <path android:fillColor="#00E676" android:pathData="M24,40 L30,40 L30,42 L24,42 Z" />
+    <path android:fillColor="#00E676" android:pathData="M24,48 L30,48 L30,50 L24,50 Z" />
+    <path android:fillColor="#00E676" android:pathData="M24,56 L30,56 L30,58 L24,58 Z" />
+    <path android:fillColor="#00E676" android:pathData="M24,64 L30,64 L30,66 L24,66 Z" />
+
+    <!-- Pins right -->
+    <path android:fillColor="#00E676" android:pathData="M78,40 L84,40 L84,42 L78,42 Z" />
+    <path android:fillColor="#00E676" android:pathData="M78,48 L84,48 L84,50 L78,50 Z" />
+    <path android:fillColor="#00E676" android:pathData="M78,56 L84,56 L84,58 L78,58 Z" />
+    <path android:fillColor="#00E676" android:pathData="M78,64 L84,64 L84,66 L78,66 Z" />
+
+</vector>

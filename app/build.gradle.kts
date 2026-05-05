@@ -8,11 +8,26 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.zfinfo64.app"
         minSdk = 26
         targetSdk = 34
         versionCode = 2
         versionName = "2.0"
+    }
+
+    flavorDimensions += "edition"
+    productFlavors {
+        create("pro") {
+            dimension = "edition"
+            applicationId = "com.zfinfo64.app"
+            resValue("string", "app_name", "ZF-INFO64 Pro")
+            buildConfigField("boolean", "IS_FREE", "false")
+        }
+        create("free") {
+            dimension = "edition"
+            applicationId = "com.zfinfo64.app.free"
+            resValue("string", "app_name", "ZF-INFO64 Free")
+            buildConfigField("boolean", "IS_FREE", "true")
+        }
     }
 
     signingConfigs {
@@ -37,6 +52,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 
     compileOptions {

@@ -2004,7 +2004,7 @@
     <string name="abc_shareactionprovider_share_with_application">Share with <ns2:g example="Mail" id="application_name">%s</ns2:g></string>
     <string name="abc_toolbar_collapse_description">Collapse</string>
     <string name="androidx_startup" translatable="false">androidx.startup</string>
-    <string name="app_name">SysInfo Pro</string>
+    <string name="app_name">ZF-INFO64</string>
     <string name="appbar_scrolling_view_behavior" translatable="false">com.google.android.material.appbar.AppBarLayout$ScrollingViewBehavior</string>
     <string name="bench_cpu_multi">CPU Multi-Core</string>
     <string name="bench_cpu_single">CPU Single-Core</string>
@@ -2180,8 +2180,10 @@
     <string name="status_bar_notification_info_overflow">999+</string>
     <string name="stress_cpu">CPU Stress</string>
     <string name="stress_duration">Durată</string>
+    <string name="stress_gpu">GPU Stress</string>
     <string name="stress_memory">Memory Stress</string>
     <string name="stress_mixed">Mixed Stress</string>
+    <string name="stress_mixed_all">Mixed All Stress</string>
     <string name="stress_status_done">Finalizat</string>
     <string name="stress_status_idle">Inactiv</string>
     <string name="stress_status_running">Rulează...</string>

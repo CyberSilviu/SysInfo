@@ -11,116 +11,215 @@ import javax.microedition.khronos.opengles.GL10
 
 class GpuStressRenderer(private val frameCounter: AtomicLong) : GLSurfaceView.Renderer {
 
-    private var program   = 0
-    private var posAttr   = -1
-    private var timeUnif  = -1
-    private var resUnif   = -1
-    private var vertexBuf: FloatBuffer? = null
-    private var startTime = System.nanoTime()
-    private var surfW = 1; private var surfH = 1
+    companion object {
+        private const val PASSES  = 60      // must be even
+        private const val FBO_W   = 1920    // fixed large FBO — forces real GPU work
+        private const val FBO_H   = 1080    // regardless of surface size
+    }
 
-    // Full-screen quad — two triangles
+    private var stressProg  = 0
+    private var blitProg    = 0
+    private val fboIds      = IntArray(2)
+    private val texIds      = IntArray(2)
+    private var fboReady    = false
+    private var vertexBuf: FloatBuffer? = null
+    private var surfW       = 1
+    private var surfH       = 1
+    private var startTime   = System.nanoTime()
+
+    // Uniform locations — stress program
+    private var sPos  = -1
+    private var sTime = -1
+    private var sPrev = -1
+    // Uniform locations — blit program
+    private var bPos  = -1
+    private var bTex  = -1
+
     private val quadVerts = floatArrayOf(
         -1f, -1f,   1f, -1f,   -1f,  1f,
          1f, -1f,   1f,  1f,   -1f,  1f
     )
 
-    // Vertex shader — pass-through
     private val vertSrc = """
-        attribute vec2 aPosition;
-        void main() { gl_Position = vec4(aPosition, 0.0, 1.0); }
+        attribute vec2 aPos;
+        varying vec2 vUV;
+        void main() {
+            vUV = aPos * 0.5 + 0.5;
+            gl_Position = vec4(aPos, 0.0, 1.0);
+        }
     """.trimIndent()
 
-    // Fragment shader — 32 heavy trig iterations per pixel.
-    // 32 is the sweet spot: GPU-bound on all devices, but won't blow the
-    // instruction-count limit that crashes older Adreno / Mali drivers.
-    private val fragSrc = """
+    // 80 heavy iterations per pixel; reads from previous-pass texture for dependency chain
+    private val stressFragSrc = """
         precision highp float;
         uniform float uTime;
-        uniform vec2  uResolution;
+        uniform sampler2D uPrev;
+        varying vec2 vUV;
         void main() {
-            vec2 uv = gl_FragCoord.xy / uResolution;
-            float v = 0.0;
-            float w = 0.0;
-            for (int i = 0; i < 32; i++) {
-                float fi = float(i) * 0.15;
-                v += sin(uv.x * 14.0 + uTime + fi) * cos(uv.y * 14.0 - uTime * 1.3 + fi);
-                v += sin(uv.x * uv.y * 9.0  + uTime * 0.9 + fi);
-                w += cos(length(uv - vec2(0.5)) * 20.0 - uTime * 2.0 + fi * 0.5);
+            vec4 seed = texture2D(uPrev, vUV);
+            float v = seed.r * 2.0 - 1.0;
+            float w = seed.g * 2.0 - 1.0;
+            float s = seed.b * 2.0 - 1.0;
+            float q = seed.a * 2.0 - 1.0;
+            for (int i = 0; i < 80; i++) {
+                float fi = float(i) * 0.09;
+                v += sin(vUV.x * 19.0 + uTime * 1.1 + fi)
+                   * cos(vUV.y * 17.0 - uTime * 1.3 + fi);
+                w += cos(length(vUV - vec2(0.5)) * 25.0 - uTime * 2.0 + fi * 0.5);
+                s += sin(vUV.x * vUV.y * 13.0 + uTime * 0.8 + fi)
+                   + cos(vUV.x * 7.0  - vUV.y * 11.0 + uTime * 1.5 + fi);
+                q += sin(v * 0.3 + w * 0.2 - s * 0.1 + uTime * 0.6 + fi);
             }
-            float r = 0.5 + 0.5 * sin(v * 1.5 + uTime);
-            float g = 0.5 + 0.5 * cos(w * 2.3 - uTime * 0.7);
-            float b = 0.5 + 0.5 * sin((v + w) * 3.1 + uTime);
-            gl_FragColor = vec4(r, g, b, 1.0);
+            gl_FragColor = vec4(
+                fract(abs(v) * 0.1 + 0.5),
+                fract(abs(w) * 0.1 + 0.5),
+                fract(abs(s) * 0.1 + 0.5),
+                fract(abs(q) * 0.1 + 0.5)
+            );
+        }
+    """.trimIndent()
+
+    private val blitFragSrc = """
+        precision mediump float;
+        uniform sampler2D uTex;
+        varying vec2 vUV;
+        void main() {
+            gl_FragColor = texture2D(uTex, vUV);
         }
     """.trimIndent()
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         startTime = System.nanoTime()
 
-        val vert = compileShader(GLES20.GL_VERTEX_SHADER,   vertSrc)
-        val frag = compileShader(GLES20.GL_FRAGMENT_SHADER, fragSrc)
-        if (vert == 0 || frag == 0) {
-            if (vert != 0) GLES20.glDeleteShader(vert)
-            if (frag != 0) GLES20.glDeleteShader(frag)
-            return
+        stressProg = buildProgram(vertSrc, stressFragSrc).also {
+            if (it == 0) return
+            sPos  = GLES20.glGetAttribLocation(it,  "aPos")
+            sTime = GLES20.glGetUniformLocation(it, "uTime")
+            sPrev = GLES20.glGetUniformLocation(it, "uPrev")
         }
 
-        val prog = GLES20.glCreateProgram()
-        if (prog == 0) { GLES20.glDeleteShader(vert); GLES20.glDeleteShader(frag); return }
-
-        GLES20.glAttachShader(prog, vert)
-        GLES20.glAttachShader(prog, frag)
-        GLES20.glLinkProgram(prog)
-        GLES20.glDeleteShader(vert)
-        GLES20.glDeleteShader(frag)
-
-        val status = IntArray(1)
-        GLES20.glGetProgramiv(prog, GLES20.GL_LINK_STATUS, status, 0)
-        if (status[0] == 0) { GLES20.glDeleteProgram(prog); return }
-
-        program  = prog
-        posAttr  = GLES20.glGetAttribLocation(program, "aPosition")
-        timeUnif = GLES20.glGetUniformLocation(program, "uTime")
-        resUnif  = GLES20.glGetUniformLocation(program, "uResolution")
+        blitProg = buildProgram(vertSrc, blitFragSrc).also {
+            if (it == 0) return
+            bPos = GLES20.glGetAttribLocation(it,  "aPos")
+            bTex = GLES20.glGetUniformLocation(it, "uTex")
+        }
 
         val bb = ByteBuffer.allocateDirect(quadVerts.size * 4)
         bb.order(ByteOrder.nativeOrder())
         vertexBuf = bb.asFloatBuffer().apply { put(quadVerts); position(0) }
+
+        setupFBOs()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        GLES20.glViewport(0, 0, width, height)
         surfW = width; surfH = height
+        // FBOs stay at fixed FBO_W × FBO_H — no resize needed
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        // Guard: do nothing if setup failed
-        if (program == 0 || posAttr < 0 || vertexBuf == null) return
+        if (stressProg == 0 || blitProg == 0 || !fboReady) return
+        val buf = vertexBuf ?: return
 
         val t = (System.nanoTime() - startTime) / 1_000_000_000f
 
-        GLES20.glUseProgram(program)
-        GLES20.glUniform1f(timeUnif, t)
-        GLES20.glUniform2f(resUnif, surfW.toFloat(), surfH.toFloat())
+        // ── 60 ping-pong stress passes at 1920×1080 ───────────────────────────
+        GLES20.glViewport(0, 0, FBO_W, FBO_H)
+        GLES20.glUseProgram(stressProg)
+        GLES20.glUniform1f(sTime, t)
+        GLES20.glEnableVertexAttribArray(sPos)
+        GLES20.glVertexAttribPointer(sPos, 2, GLES20.GL_FLOAT, false, 0, buf)
 
-        val buf = vertexBuf ?: return
-        GLES20.glEnableVertexAttribArray(posAttr)
-        GLES20.glVertexAttribPointer(posAttr, 2, GLES20.GL_FLOAT, false, 0, buf)
+        var cur = 0
+        repeat(PASSES) {
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboIds[cur])
+            GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texIds[1 - cur])
+            GLES20.glUniform1i(sPrev, 0)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6)
+            cur = 1 - cur
+        }
+        // PASSES is even → last write was into fboIds[1], so final texture = texIds[1]
+        GLES20.glDisableVertexAttribArray(sPos)
+
+        // ── Blit final FBO texture to screen ──────────────────────────────────
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        GLES20.glViewport(0, 0, surfW, surfH)
+        GLES20.glUseProgram(blitProg)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texIds[1])
+        GLES20.glUniform1i(bTex, 0)
+        GLES20.glEnableVertexAttribArray(bPos)
+        GLES20.glVertexAttribPointer(bPos, 2, GLES20.GL_FLOAT, false, 0, buf)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 6)
-        GLES20.glDisableVertexAttribArray(posAttr)
+        GLES20.glDisableVertexAttribArray(bPos)
 
         frameCounter.incrementAndGet()
     }
 
+    // ── FBO setup at fixed 1920×1080 ─────────────────────────────────────────
+
+    private fun setupFBOs() {
+        if (fboReady) {
+            GLES20.glDeleteFramebuffers(2, fboIds, 0)
+            GLES20.glDeleteTextures(2, texIds, 0)
+            fboReady = false
+        }
+
+        GLES20.glGenFramebuffers(2, fboIds, 0)
+        GLES20.glGenTextures(2, texIds, 0)
+
+        for (i in 0..1) {
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, texIds[i])
+            GLES20.glTexImage2D(
+                GLES20.GL_TEXTURE_2D, 0, GLES20.GL_RGBA,
+                FBO_W, FBO_H, 0, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, null
+            )
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fboIds[i])
+            GLES20.glFramebufferTexture2D(
+                GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0,
+                GLES20.GL_TEXTURE_2D, texIds[i], 0
+            )
+            if (GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER) != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                return
+            }
+        }
+
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
+        fboReady = true
+    }
+
+    // ── Shader helpers ────────────────────────────────────────────────────────
+
     private fun compileShader(type: Int, src: String): Int {
-        val shader = GLES20.glCreateShader(type)
-        if (shader == 0) return 0
-        GLES20.glShaderSource(shader, src)
-        GLES20.glCompileShader(shader)
-        val status = IntArray(1)
-        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status, 0)
-        if (status[0] == 0) { GLES20.glDeleteShader(shader); return 0 }
-        return shader
+        val sh = GLES20.glCreateShader(type)
+        if (sh == 0) return 0
+        GLES20.glShaderSource(sh, src)
+        GLES20.glCompileShader(sh)
+        val st = IntArray(1)
+        GLES20.glGetShaderiv(sh, GLES20.GL_COMPILE_STATUS, st, 0)
+        if (st[0] == 0) { GLES20.glDeleteShader(sh); return 0 }
+        return sh
+    }
+
+    private fun buildProgram(vs: String, fs: String): Int {
+        val v = compileShader(GLES20.GL_VERTEX_SHADER,   vs); if (v == 0) return 0
+        val f = compileShader(GLES20.GL_FRAGMENT_SHADER, fs)
+        if (f == 0) { GLES20.glDeleteShader(v); return 0 }
+        val p = GLES20.glCreateProgram()
+        if (p == 0) { GLES20.glDeleteShader(v); GLES20.glDeleteShader(f); return 0 }
+        GLES20.glAttachShader(p, v); GLES20.glAttachShader(p, f)
+        GLES20.glLinkProgram(p)
+        GLES20.glDeleteShader(v); GLES20.glDeleteShader(f)
+        val st = IntArray(1)
+        GLES20.glGetProgramiv(p, GLES20.GL_LINK_STATUS, st, 0)
+        if (st[0] == 0) { GLES20.glDeleteProgram(p); return 0 }
+        return p
     }
 }

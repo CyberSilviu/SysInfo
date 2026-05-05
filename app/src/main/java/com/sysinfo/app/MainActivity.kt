@@ -17,6 +17,11 @@ class MainActivity : AppCompatActivity() {
         val navController = navHostFragment.navController
 
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottomNav)
+
+        if (BuildConfig.IS_FREE) {
+            bottomNav.menu.removeItem(R.id.benchmarkFragment)
+        }
+
         bottomNav.setupWithNavController(navController)
     }
 }

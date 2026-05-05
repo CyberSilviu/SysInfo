@@ -16,7 +16,10 @@
       "Bash(pip install:*)",
       "Bash(python -c ':*)",
       "Bash(python -m PyInstaller \"ZF-Info64-Windows.spec\" --distpath ./dist --workpath ./build/pyinstaller --noconfirm)",
-      "Bash(python setup_msi.py bdist_msi)"
+      "Bash(python setup_msi.py bdist_msi)",
+      "Bash(cd /d \"d:\\\\Desktop_30_04-26\\\\SysInfo\")",
+      "Bash(Get-ChildItem -Recurse -Force)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

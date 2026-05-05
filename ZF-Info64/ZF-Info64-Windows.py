@@ -1,6 +1,7 @@
 """
-ZF-Info64 v2.0 — System Information & Benchmark Tool for Windows
+ZF-Info64 Pro v2.0 — System Information & Benchmark Tool for Windows
 """
+APP_EDITION = "Pro"   # change to "Free" for the Free build
 
 import tkinter as tk
 from tkinter import ttk
@@ -160,6 +161,94 @@ def _get_ram_modules():
 def _get_battery_cycle_count():
     return _load_hw_cache()["bat_cycle"]
 
+# ── GPU enumeration (WMIC + DXGI) ────────────────────────────────────────────
+def _get_gpu_list():
+    """Returns list of {'name', 'vram_mb'} via WMIC Win32_VideoController."""
+    try:
+        r = subprocess.run(
+            ['wmic', 'path', 'Win32_VideoController',
+             'get', 'Name,AdapterRAM', '/format:csv'],
+            capture_output=True, text=True, timeout=12,
+            creationflags=0x08000000)
+        gpus = []
+        for line in r.stdout.strip().splitlines():
+            parts = [p.strip() for p in line.split(',')]
+            if len(parts) < 3:
+                continue
+            ram_str, name = parts[1], parts[2]
+            if not name or name in ('AdapterRAM', 'Name'):
+                continue
+            try:
+                vram_mb = max(0, int(ram_str or '0')) >> 20
+            except ValueError:
+                vram_mb = 0
+            gpus.append({'name': name, 'vram_mb': vram_mb})
+        return gpus
+    except Exception:
+        return []
+
+
+def _enumerate_dxgi_adapters():
+    """Returns list of {'index', 'name', 'vram_mb'} via DXGI COM vtables."""
+    try:
+        import ctypes, ctypes.wintypes as wt
+
+        class DXGI_ADAPTER_DESC(ctypes.Structure):
+            _fields_ = [
+                ("Description",           ctypes.c_wchar * 128),
+                ("VendorId",              ctypes.c_uint),
+                ("DeviceId",              ctypes.c_uint),
+                ("SubSysId",              ctypes.c_uint),
+                ("Revision",              ctypes.c_uint),
+                ("DedicatedVideoMemory",  ctypes.c_size_t),
+                ("DedicatedSystemMemory", ctypes.c_size_t),
+                ("SharedSystemMemory",    ctypes.c_size_t),
+                ("AdapterLuid",           ctypes.c_int64),
+            ]
+
+        dxgi = ctypes.WinDLL("dxgi")
+        dxgi.CreateDXGIFactory.restype  = ctypes.c_int
+        dxgi.CreateDXGIFactory.argtypes = [ctypes.c_void_p,
+                                           ctypes.POINTER(ctypes.c_void_p)]
+        # IID_IDXGIFactory {7b7194f4-3514-4d46-9722-d10b8512f863}
+        iid = (ctypes.c_byte * 16)(
+            0xf4,0x94,0x71,0x7b, 0x14,0x35, 0x46,0x4d,
+            0x97,0x22,0xd1,0x0b,0x85,0x12,0xf8,0x63)
+        ppF = ctypes.c_void_p(0)
+        if dxgi.CreateDXGIFactory(iid, ctypes.byref(ppF)) != 0 or not ppF.value:
+            return []
+
+        def vtbl_fn(obj, idx, restype, *argtypes):
+            vp = ctypes.cast(ctypes.cast(obj, ctypes.POINTER(ctypes.c_void_p))
+                             .contents.value,
+                             ctypes.POINTER(ctypes.c_void_p))
+            return ctypes.cast(vp[idx], ctypes.CFUNCTYPE(restype, ctypes.c_void_p,
+                                                          *argtypes))
+
+        fn_fRelease     = vtbl_fn(ppF.value, 2, ctypes.c_ulong)
+        fn_EnumAdapters = vtbl_fn(ppF.value, 7, ctypes.c_int,
+                                  ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p))
+        adapters = []
+        for i in range(16):
+            ppA = ctypes.c_void_p(0)
+            if fn_EnumAdapters(ppF.value, i, ctypes.byref(ppA)) != 0:
+                break
+            fn_aRelease = vtbl_fn(ppA.value, 2, ctypes.c_ulong)
+            fn_GetDesc  = vtbl_fn(ppA.value, 8, ctypes.c_int,
+                                  ctypes.POINTER(DXGI_ADAPTER_DESC))
+            desc = DXGI_ADAPTER_DESC()
+            if fn_GetDesc(ppA.value, ctypes.byref(desc)) == 0:
+                name = desc.Description
+                if "Microsoft Basic" not in name and "WARP" not in name:
+                    adapters.append({'index': i, 'name': name,
+                                     'vram_mb': desc.DedicatedVideoMemory >> 20})
+            fn_aRelease(ppA.value)
+        fn_fRelease(ppF.value)
+        return adapters
+    except Exception:
+        return []
+
+
 # ── Module-level workers (must be top-level for multiprocessing/ProcessPoolExecutor) ──
 def _cpu_stress_worker_fn():
     import math
@@ -174,6 +263,632 @@ def _cpu_stress_worker_fn():
         for i in range(500_000):
             x = math.sin(x) * math.cos(x) + math.sqrt(abs(x) + 1.0)
             x = math.log(abs(x) + 1.0) * math.exp(x * 0.0001)
+
+def _gpu_stress_worker_fn(adapter_index=0):
+    """GPU stress in a separate process — crashes here don't affect the main app."""
+    import os as _os_w, tempfile as _tmp
+    _log_path = _os_w.path.join(_tmp.gettempdir(), "ZFInfo64_gpu_stress.log")
+    def _log(msg):
+        try:
+            with open(_log_path, "a", encoding="utf-8") as _f:
+                import time as _tt
+                _f.write(f"[{_tt.strftime('%H:%M:%S')}] adapter={adapter_index} {msg}\n")
+        except Exception: pass
+
+    _log("worker started")
+
+    # ── Try D3D11 compute shader on selected adapter (best approach) ──────────
+    try:
+        import ctypes, time as _t
+
+        import os as _os_d3d
+        _sys32 = _os_d3d.path.join(_os_d3d.environ.get("SystemRoot", r"C:\Windows"), "System32")
+        _log(f"sys32={_sys32}")
+        d3d11 = ctypes.WinDLL("d3d11")
+        dxgi  = ctypes.WinDLL("dxgi")
+        _d3dc_path = _os_d3d.path.join(_sys32, "d3dcompiler_47.dll")
+        _log(f"loading {_d3dc_path}")
+        d3dc  = ctypes.WinDLL(_d3dc_path)
+        _log("DLLs loaded OK")
+
+        class DXGI_ADAPTER_DESC(ctypes.Structure):
+            _fields_ = [
+                ("Description",           ctypes.c_wchar * 128),
+                ("VendorId",              ctypes.c_uint),
+                ("DeviceId",              ctypes.c_uint),
+                ("SubSysId",              ctypes.c_uint),
+                ("Revision",              ctypes.c_uint),
+                ("DedicatedVideoMemory",  ctypes.c_size_t),
+                ("DedicatedSystemMemory", ctypes.c_size_t),
+                ("SharedSystemMemory",    ctypes.c_size_t),
+                ("AdapterLuid",           ctypes.c_int64),
+            ]
+
+        def vtbl_fn(obj, idx, restype, *argtypes):
+            vp = ctypes.cast(
+                ctypes.cast(obj, ctypes.POINTER(ctypes.c_void_p)).contents.value,
+                ctypes.POINTER(ctypes.c_void_p))
+            return ctypes.cast(vp[idx],
+                               ctypes.CFUNCTYPE(restype, ctypes.c_void_p, *argtypes))
+
+        # Get DXGI adapter at adapter_index
+        iid = (ctypes.c_byte * 16)(
+            0xf4,0x94,0x71,0x7b, 0x14,0x35, 0x46,0x4d,
+            0x97,0x22,0xd1,0x0b,0x85,0x12,0xf8,0x63)
+        dxgi.CreateDXGIFactory.restype  = ctypes.c_int
+        dxgi.CreateDXGIFactory.argtypes = [ctypes.c_void_p,
+                                            ctypes.POINTER(ctypes.c_void_p)]
+        ppF = ctypes.c_void_p(0)
+        hr_fac = dxgi.CreateDXGIFactory(iid, ctypes.byref(ppF))
+        if hr_fac != 0 or not ppF.value:
+            raise RuntimeError(f"CreateDXGIFactory failed hr={hr_fac:#010x}")
+        _log("factory OK")
+
+        fn_fRel  = vtbl_fn(ppF.value, 2, ctypes.c_ulong)
+        fn_Enum  = vtbl_fn(ppF.value, 7, ctypes.c_int,
+                           ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p))
+
+        ppA = ctypes.c_void_p(0)
+        hr  = fn_Enum(ppF.value, adapter_index, ctypes.byref(ppA))
+        fn_fRel(ppF.value)
+        if hr != 0 or not ppA.value:
+            raise RuntimeError(f"EnumAdapters({adapter_index}) failed hr={hr:#010x}")
+        _log(f"adapter[{adapter_index}] OK")
+
+        fn_aRel = vtbl_fn(ppA.value, 2, ctypes.c_ulong)
+
+        # Create D3D11 device on this adapter
+        d3d11.D3D11CreateDevice.restype  = ctypes.c_int
+        d3d11.D3D11CreateDevice.argtypes = [
+            ctypes.c_void_p,   # pAdapter
+            ctypes.c_uint,     # DriverType (0=UNKNOWN when adapter given)
+            ctypes.c_void_p,   # Software
+            ctypes.c_uint,     # Flags
+            ctypes.c_void_p,   # pFeatureLevels
+            ctypes.c_uint,     # FeatureLevels count
+            ctypes.c_uint,     # SDKVersion
+            ctypes.POINTER(ctypes.c_void_p),  # ppDevice
+            ctypes.c_void_p,   # pFeatureLevel output
+            ctypes.POINTER(ctypes.c_void_p),  # ppImmediateContext
+        ]
+        ppDev = ctypes.c_void_p(0)
+        ppCtx = ctypes.c_void_p(0)
+        hr = d3d11.D3D11CreateDevice(
+            ppA.value, 0, None, 0, None, 0, 7,   # SDK=7
+            ctypes.byref(ppDev), None, ctypes.byref(ppCtx))
+        fn_aRel(ppA.value)
+        if hr != 0 or not ppDev.value:
+            raise RuntimeError(f"D3D11CreateDevice failed hr={hr:#010x}")
+        _log("D3D11 device OK")
+
+        # Compile compute shader (cs_5_0) — 1024 heavy trig ops per thread
+        HLSL = (
+            b"[numthreads(256,1,1)]\n"
+            b"void CSMain(uint3 id : SV_DispatchThreadID) {\n"
+            b"    float v = (float)id.x / 65536.0f + (float)id.y * 0.0001f;\n"
+            b"    for (int i = 0; i < 1024; i++) {\n"
+            b"        v = sin(v * 6.283185f) + cos(v * 3.141592f);\n"
+            b"        v = sqrt(abs(v) + 1.0f) * 0.9999f;\n"
+            b"    }\n"
+            b"    if (v > 1e10f) { v = 0; }\n"
+            b"}\n"
+        )
+        ppBlob = ctypes.c_void_p(0)
+        ppErr  = ctypes.c_void_p(0)
+        d3dc.D3DCompile.restype  = ctypes.c_int
+        d3dc.D3DCompile.argtypes = [
+            ctypes.c_void_p, ctypes.c_size_t, ctypes.c_char_p,
+            ctypes.c_void_p, ctypes.c_void_p, ctypes.c_char_p, ctypes.c_char_p,
+            ctypes.c_uint, ctypes.c_uint,
+            ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p)]
+        hr = d3dc.D3DCompile(HLSL, len(HLSL), None, None, None,
+                             b"CSMain", b"cs_5_0", 0, 0,
+                             ctypes.byref(ppBlob), ctypes.byref(ppErr))
+        if hr != 0 or not ppBlob.value:
+            raise RuntimeError(f"D3DCompile failed hr={hr:#010x}")
+        _log("shader compiled OK")
+
+        fn_bPtr  = vtbl_fn(ppBlob.value, 3, ctypes.c_void_p)
+        fn_bSize = vtbl_fn(ppBlob.value, 4, ctypes.c_size_t)
+        fn_bRel  = vtbl_fn(ppBlob.value, 2, ctypes.c_ulong)
+        bytecode = ctypes.string_at(fn_bPtr(ppBlob.value),
+                                    fn_bSize(ppBlob.value))
+        fn_bRel(ppBlob.value)
+
+        # Create compute shader
+        fn_CreateCS = vtbl_fn(ppDev.value, 18, ctypes.c_int,  # ID3D11Device::CreateComputeShader = vtbl[18]
+                               ctypes.c_void_p, ctypes.c_size_t,
+                               ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p))
+        ppCS  = ctypes.c_void_p(0)
+        bc    = ctypes.create_string_buffer(bytecode)
+        hr    = fn_CreateCS(ppDev.value, bc, len(bytecode), None, ctypes.byref(ppCS))
+        if hr != 0 or not ppCS.value:
+            raise RuntimeError(f"CreateComputeShader failed hr={hr:#010x}")
+        _log("compute shader created OK")
+
+        fn_csRel = vtbl_fn(ppCS.value, 2, ctypes.c_ulong)
+
+        # ID3D11DeviceContext vtable (IUnknown[0-2] + ID3D11DeviceChild[3-6] + ctx methods):
+        # vtbl[41] = Dispatch
+        # vtbl[69] = CSSetShader
+        fn_Dispatch    = vtbl_fn(ppCtx.value, 41, None,
+                                  ctypes.c_uint, ctypes.c_uint, ctypes.c_uint)
+        fn_CSSetShader = vtbl_fn(ppCtx.value, 69, None,
+                                  ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint)
+        fn_ctxRel      = vtbl_fn(ppCtx.value, 2, ctypes.c_ulong)
+        fn_devRel      = vtbl_fn(ppDev.value, 2, ctypes.c_ulong)
+
+        fn_CSSetShader(ppCtx.value, ppCS.value, None, 0)
+        _log("D3D11 dispatch loop starting")
+
+        # Dispatch loop — 512×512×1 = 262 144 groups × 256 threads × 1024 ops
+        while True:
+            fn_Dispatch(ppCtx.value, 512, 512, 1)
+            _t.sleep(0.001)
+
+        fn_csRel(ppCS.value)
+        fn_ctxRel(ppCtx.value)
+        fn_devRel(ppDev.value)
+        return
+    except Exception as _e:
+        _log(f"D3D11 failed: {_e}")
+
+    # ── D3D9 fallback (supports adapter selection, no shader compiler needed) ──
+    _log("trying D3D9 fallback")
+    try:
+        import ctypes, ctypes.wintypes as wt, time as _t
+
+        def _vtbl9(obj, idx, restype, *argtypes):
+            vp = ctypes.cast(
+                ctypes.cast(obj, ctypes.POINTER(ctypes.c_void_p)).contents.value,
+                ctypes.POINTER(ctypes.c_void_p))
+            return ctypes.cast(vp[idx],
+                               ctypes.CFUNCTYPE(restype, ctypes.c_void_p, *argtypes))
+
+        d9dll = ctypes.WinDLL("d3d9")
+        d9dll.Direct3DCreate9.restype  = ctypes.c_void_p
+        d9dll.Direct3DCreate9.argtypes = [ctypes.c_uint]
+        pD3D = d9dll.Direct3DCreate9(32)  # D3D_SDK_VERSION = 32
+        if not pD3D:
+            raise RuntimeError("Direct3DCreate9 failed")
+
+        fn_d3d_rel = _vtbl9(pD3D, 2, ctypes.c_ulong)
+
+        k32_d9  = ctypes.windll.kernel32
+        user_d9 = ctypes.windll.user32
+        WNDPROC9 = ctypes.WINFUNCTYPE(ctypes.c_longlong, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+        _proc9 = WNDPROC9(lambda h, m, w, l: user_d9.DefWindowProcW(h, m, w, l))
+
+        class _WNDCLS9(ctypes.Structure):
+            _fields_ = [
+                ("style", wt.UINT), ("lpfnWndProc", WNDPROC9),
+                ("cbClsExtra", ctypes.c_int), ("cbWndExtra", ctypes.c_int),
+                ("hInstance", wt.HINSTANCE), ("hIcon", wt.HANDLE),
+                ("hCursor", wt.HANDLE), ("hbrBackground", wt.HBRUSH),
+                ("lpszMenuName", wt.LPCWSTR), ("lpszClassName", wt.LPCWSTR),
+            ]
+
+        hinst9 = k32_d9.GetModuleHandleW(None)
+        cls9   = "ZFD3D9Stress"
+        wc9 = _WNDCLS9(); wc9.lpfnWndProc = _proc9
+        wc9.hInstance = hinst9; wc9.lpszClassName = cls9
+        user_d9.RegisterClassW(ctypes.byref(wc9))
+        hwnd9 = user_d9.CreateWindowExW(0, cls9, "ZF D3D9",
+                                         0, 0, 0, 1, 1, None, None, hinst9, None)
+        if not hwnd9:
+            fn_d3d_rel(pD3D)
+            raise RuntimeError("CreateWindow for D3D9 failed")
+
+        class _D3DPP(ctypes.Structure):
+            _fields_ = [
+                ("BackBufferWidth",            ctypes.c_uint),
+                ("BackBufferHeight",           ctypes.c_uint),
+                ("BackBufferFormat",           ctypes.c_uint),   # D3DFMT_X8R8G8B8=22
+                ("BackBufferCount",            ctypes.c_uint),
+                ("MultiSampleType",            ctypes.c_uint),
+                ("MultiSampleQuality",         ctypes.c_ulong),
+                ("SwapEffect",                 ctypes.c_uint),   # D3DSWAPEFFECT_DISCARD=1
+                ("hDeviceWindow",              wt.HWND),
+                ("Windowed",                   ctypes.c_int),
+                ("EnableAutoDepthStencil",     ctypes.c_int),
+                ("AutoDepthStencilFormat",     ctypes.c_uint),
+                ("Flags",                      ctypes.c_ulong),
+                ("FullScreen_RefreshRateInHz", ctypes.c_uint),
+                ("PresentationInterval",       ctypes.c_uint),
+            ]
+
+        pp9 = _D3DPP()
+        pp9.BackBufferFormat     = 22   # D3DFMT_X8R8G8B8
+        pp9.BackBufferCount      = 1
+        pp9.SwapEffect           = 1    # D3DSWAPEFFECT_DISCARD
+        pp9.hDeviceWindow        = hwnd9
+        pp9.Windowed             = 1
+        pp9.PresentationInterval = 0    # D3DPRESENT_INTERVAL_IMMEDIATE
+
+        # IDirect3D9::CreateDevice = vtbl[16]
+        fn_CreateDev9 = _vtbl9(pD3D, 16, ctypes.c_int,
+                                ctypes.c_uint, ctypes.c_uint, wt.HWND,
+                                ctypes.c_ulong, ctypes.c_void_p,
+                                ctypes.POINTER(ctypes.c_void_p))
+        ppDev9 = ctypes.c_void_p(0)
+        hr = fn_CreateDev9(pD3D, adapter_index, 1, hwnd9,  # D3DDEVTYPE_HAL=1
+                            0x40,  # D3DCREATE_HARDWARE_VERTEXPROCESSING
+                            ctypes.byref(pp9), ctypes.byref(ppDev9))
+        if hr != 0 or not ppDev9.value:
+            # retry with software VP
+            pp9b = _D3DPP(); ctypes.memmove(ctypes.byref(pp9b), ctypes.byref(pp9), ctypes.sizeof(_D3DPP))
+            hr = fn_CreateDev9(pD3D, adapter_index, 1, hwnd9,
+                                0x20,  # D3DCREATE_SOFTWARE_VERTEXPROCESSING
+                                ctypes.byref(pp9b), ctypes.byref(ppDev9))
+        fn_d3d_rel(pD3D)
+        if hr != 0 or not ppDev9.value:
+            raise RuntimeError(f"D3D9 CreateDevice failed hr={hr:#010x}")
+
+        fn_dev9_rel = _vtbl9(ppDev9.value, 2, ctypes.c_ulong)
+
+        # IDirect3DDevice9::CreateRenderTarget = vtbl[28]
+        fn_CreateRT = _vtbl9(ppDev9.value, 28, ctypes.c_int,
+                              ctypes.c_uint, ctypes.c_uint, ctypes.c_uint,
+                              ctypes.c_uint, ctypes.c_ulong, ctypes.c_int,
+                              ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p)
+        ppS0 = ctypes.c_void_p(0)
+        ppS1 = ctypes.c_void_p(0)
+        FW9, FH9 = 1920, 1080
+        r0 = fn_CreateRT(ppDev9.value, FW9, FH9, 22, 0, 0, 0, ctypes.byref(ppS0), None)
+        r1 = fn_CreateRT(ppDev9.value, FW9, FH9, 22, 0, 0, 0, ctypes.byref(ppS1), None)
+        if r0 != 0 or r1 != 0 or not ppS0.value or not ppS1.value:
+            fn_dev9_rel(ppDev9.value)
+            raise RuntimeError("D3D9 CreateRenderTarget failed")
+
+        fn_s0_rel = _vtbl9(ppS0.value, 2, ctypes.c_ulong)
+        fn_s1_rel = _vtbl9(ppS1.value, 2, ctypes.c_ulong)
+
+        # IDirect3DDevice9::StretchRect = vtbl[34]
+        fn_StretchRect = _vtbl9(ppDev9.value, 34, ctypes.c_int,
+                                 ctypes.c_void_p, ctypes.c_void_p,
+                                 ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint)
+
+        # IDirect3DDevice9::Present = vtbl[17]
+        fn_Pres9 = _vtbl9(ppDev9.value, 17, ctypes.c_int,
+                           ctypes.c_void_p, ctypes.c_void_p,
+                           ctypes.c_void_p, ctypes.c_void_p)
+
+        surfs9 = [ppS0.value, ppS1.value]
+        cur9 = 0
+        _log("D3D9 dispatch loop starting")
+        while True:
+            for _ in range(32):
+                fn_StretchRect(ppDev9.value, surfs9[cur9], None,
+                               surfs9[1 - cur9], None, 2)  # D3DTEXF_LINEAR
+                cur9 ^= 1
+            fn_Pres9(ppDev9.value, None, None, None, None)
+            _t.sleep(0.001)
+
+        fn_s0_rel(ppS0.value); fn_s1_rel(ppS1.value)
+        fn_dev9_rel(ppDev9.value)
+        return
+    except Exception as _e9:
+        _log(f"D3D9 failed: {_e9}")
+
+    # ── OpenGL fallback (creates visible window) ──────────────────────────────
+    _log("trying OpenGL fallback (no adapter selection)")
+    try:
+        import ctypes, ctypes.wintypes as wt, time, math
+
+        gl   = ctypes.WinDLL("opengl32")
+        gdi  = ctypes.windll.gdi32
+        user = ctypes.windll.user32
+        k32  = ctypes.windll.kernel32
+
+        class PIXELFORMATDESCRIPTOR(ctypes.Structure):
+            _fields_ = [
+                ("nSize", wt.WORD), ("nVersion", wt.WORD), ("dwFlags", wt.DWORD),
+                ("iPixelType", ctypes.c_ubyte), ("cColorBits", ctypes.c_ubyte),
+                ("cRedBits",   ctypes.c_ubyte), ("cRedShift",   ctypes.c_ubyte),
+                ("cGreenBits", ctypes.c_ubyte), ("cGreenShift", ctypes.c_ubyte),
+                ("cBlueBits",  ctypes.c_ubyte), ("cBlueShift",  ctypes.c_ubyte),
+                ("cAlphaBits", ctypes.c_ubyte), ("cAlphaShift", ctypes.c_ubyte),
+                ("cAccumBits", ctypes.c_ubyte), ("cAccumRedBits", ctypes.c_ubyte),
+                ("cAccumGreenBits", ctypes.c_ubyte), ("cAccumBlueBits", ctypes.c_ubyte),
+                ("cAccumAlphaBits", ctypes.c_ubyte), ("cDepthBits", ctypes.c_ubyte),
+                ("cStencilBits", ctypes.c_ubyte), ("cAuxBuffers", ctypes.c_ubyte),
+                ("iLayerType", ctypes.c_ubyte), ("bReserved", ctypes.c_ubyte),
+                ("dwLayerMask", wt.DWORD), ("dwVisibleMask", wt.DWORD),
+                ("dwDamageMask", wt.DWORD),
+            ]
+
+        WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong,
+                                     wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
+        _proc = WNDPROC(lambda h, m, w, l: user.DefWindowProcW(h, m, w, l))
+
+        class WNDCLASSW(ctypes.Structure):
+            _fields_ = [
+                ("style", wt.UINT), ("lpfnWndProc", WNDPROC),
+                ("cbClsExtra", ctypes.c_int), ("cbWndExtra", ctypes.c_int),
+                ("hInstance", wt.HINSTANCE), ("hIcon", wt.HANDLE),
+                ("hCursor", wt.HANDLE), ("hbrBackground", wt.HBRUSH),
+                ("lpszMenuName", wt.LPCWSTR), ("lpszClassName", wt.LPCWSTR),
+            ]
+
+        hinstance  = k32.GetModuleHandleW(None)
+        class_name = "ZFGLStressProc"
+        wc = WNDCLASSW()
+        wc.lpfnWndProc   = _proc
+        wc.hInstance     = hinstance
+        wc.lpszClassName = class_name
+        user.RegisterClassW(ctypes.byref(wc))
+
+        W, H = 1280, 720
+        sw = user.GetSystemMetrics(0)
+        sh = user.GetSystemMetrics(1)
+        hwnd = user.CreateWindowExW(
+            0x00000080, class_name, "ZF-Info64 GPU Stress",
+            0x80000000 | 0x10000000,
+            (sw - W) // 2, (sh - H) // 2, W, H,
+            None, None, hinstance, None)
+        if not hwnd:
+            return
+        user.ShowWindow(hwnd, 1)
+
+        hdc = user.GetDC(hwnd)
+        pfd = PIXELFORMATDESCRIPTOR()
+        pfd.nSize = ctypes.sizeof(PIXELFORMATDESCRIPTOR)
+        pfd.nVersion = 1
+        pfd.dwFlags = 4 | 32 | 1
+        pfd.cColorBits = 32
+        pfd.cDepthBits = 24
+        pf = gdi.ChoosePixelFormat(hdc, ctypes.byref(pfd))
+        gdi.SetPixelFormat(hdc, pf, ctypes.byref(pfd))
+
+        gl.wglGetProcAddress.restype  = ctypes.c_void_p
+        gl.wglGetProcAddress.argtypes = [ctypes.c_char_p]
+
+        def get_proc(name, restype, *argtypes):
+            addr = gl.wglGetProcAddress(name)
+            if not addr:
+                raise RuntimeError(f"{name} not found")
+            return ctypes.cast(addr, ctypes.CFUNCTYPE(restype, *argtypes))
+
+        # Bootstrap: GL1 context → upgrade to GL2 via wglCreateContextAttribsARB
+        tmp = gl.wglCreateContext(hdc)
+        gl.wglMakeCurrent(hdc, tmp)
+
+        try:
+            _mkctx = get_proc(b"wglCreateContextAttribsARB",
+                               wt.HANDLE, wt.HDC, wt.HANDLE,
+                               ctypes.POINTER(ctypes.c_int))
+            attribs = (ctypes.c_int * 5)(0x2091, 2, 0x2092, 0, 0)
+            hglrc = _mkctx(hdc, None, attribs)
+            if not hglrc:
+                raise RuntimeError("GL2 context creation returned NULL")
+            gl.wglMakeCurrent(None, None)
+            gl.wglDeleteContext(tmp)
+            gl.wglMakeCurrent(hdc, hglrc)
+        except Exception:
+            hglrc = tmp  # stay on GL1; shader compilation will fail below → legacy fallback
+
+        try:
+            get_proc(b"wglSwapIntervalEXT", ctypes.c_int, ctypes.c_int)(0)
+        except Exception:
+            pass
+
+        # Try to load GL2 functions and compile shaders
+        use_shaders = False
+        try:
+            _ui = ctypes.c_uint;  _i  = ctypes.c_int;    _f  = ctypes.c_float
+            _vp = ctypes.c_void_p; _cp = ctypes.c_char_p
+            _pi = ctypes.POINTER(ctypes.c_int)
+            _pu = ctypes.POINTER(ctypes.c_uint)
+
+            glCreateShader            = get_proc(b"glCreateShader",            _ui,  _ui)
+            glShaderSource            = get_proc(b"glShaderSource",            None, _ui, _i,
+                                                 ctypes.POINTER(_cp), _pi)
+            glCompileShader           = get_proc(b"glCompileShader",           None, _ui)
+            glGetShaderiv             = get_proc(b"glGetShaderiv",             None, _ui, _ui, _pi)
+            glCreateProgram           = get_proc(b"glCreateProgram",           _ui)
+            glAttachShader            = get_proc(b"glAttachShader",            None, _ui, _ui)
+            glLinkProgram             = get_proc(b"glLinkProgram",             None, _ui)
+            glGetProgramiv            = get_proc(b"glGetProgramiv",            None, _ui, _ui, _pi)
+            glUseProgram              = get_proc(b"glUseProgram",              None, _ui)
+            glGetAttribLocation       = get_proc(b"glGetAttribLocation",       _i,   _ui, _cp)
+            glGetUniformLocation      = get_proc(b"glGetUniformLocation",      _i,   _ui, _cp)
+            glEnableVertexAttribArray = get_proc(b"glEnableVertexAttribArray", None, _ui)
+            glVertexAttribPointer     = get_proc(b"glVertexAttribPointer",     None, _ui, _i,
+                                                 _ui, ctypes.c_ubyte, _i, _vp)
+            glUniform1f               = get_proc(b"glUniform1f",               None, _i, _f)
+            glUniform1i               = get_proc(b"glUniform1i",               None, _i, _i)
+            glActiveTexture           = get_proc(b"glActiveTexture",           None, _ui)
+            glGenFramebuffers         = get_proc(b"glGenFramebuffers",         None, _i, _pu)
+            glBindFramebuffer         = get_proc(b"glBindFramebuffer",         None, _ui, _ui)
+            glFramebufferTexture2D    = get_proc(b"glFramebufferTexture2D",    None, _ui, _ui,
+                                                 _ui, _ui, _i)
+            glCheckFramebufferStatus  = get_proc(b"glCheckFramebufferStatus",  _ui,  _ui)
+            glDeleteShader            = get_proc(b"glDeleteShader",            None, _ui)
+            glDeleteProgram           = get_proc(b"glDeleteProgram",           None, _ui)
+
+            gl.glGenTextures.argtypes   = [_i, _pu]
+            gl.glBindTexture.argtypes   = [_ui, _ui]
+            gl.glTexImage2D.argtypes    = [_ui, _i, _i, _i, _i, _i, _ui, _ui, _vp]
+            gl.glTexParameteri.argtypes = [_ui, _ui, _i]
+            gl.glViewport.argtypes      = [_i, _i, _i, _i]
+            gl.glDrawArrays.argtypes    = [_ui, _i, _i]
+
+            VERT = b"""
+attribute vec2 aPos;
+varying vec2 vUV;
+void main() {
+    vUV = aPos * 0.5 + 0.5;
+    gl_Position = vec4(aPos, 0.0, 1.0);
+}
+"""
+            STRESS_FRAG = b"""
+varying vec2 vUV;
+uniform float uTime;
+uniform sampler2D uPrev;
+void main() {
+    vec4 seed = texture2D(uPrev, vUV);
+    float v = seed.r * 2.0 - 1.0;
+    float w = seed.g * 2.0 - 1.0;
+    float s = seed.b * 2.0 - 1.0;
+    float q = seed.a * 2.0 - 1.0;
+    for (int i = 0; i < 80; i++) {
+        float fi = float(i) * 0.09;
+        v += sin(vUV.x*19.0 + uTime*1.1 + fi) * cos(vUV.y*17.0 - uTime*1.3 + fi);
+        w += cos(sqrt((vUV.x-0.5)*(vUV.x-0.5)+(vUV.y-0.5)*(vUV.y-0.5))*25.0
+                 - uTime*2.0 + fi*0.5);
+        s += sin(vUV.x*vUV.y*13.0 + uTime*0.8 + fi)
+           + cos(vUV.x*7.0 - vUV.y*11.0 + uTime*1.5 + fi);
+        q += sin(v*0.3 + w*0.2 - s*0.1 + uTime*0.6 + fi);
+    }
+    gl_FragColor = vec4(fract(abs(v)*0.1+0.5), fract(abs(w)*0.1+0.5),
+                        fract(abs(s)*0.1+0.5), fract(abs(q)*0.1+0.5));
+}
+"""
+            BLIT_FRAG = b"""
+varying vec2 vUV;
+uniform sampler2D uTex;
+void main() { gl_FragColor = texture2D(uTex, vUV); }
+"""
+
+            def compile_shader(kind, src):
+                sh  = glCreateShader(kind)
+                arr = (ctypes.c_char_p * 1)(src)
+                glShaderSource(sh, 1, arr, None)
+                glCompileShader(sh)
+                st = ctypes.c_int(0)
+                glGetShaderiv(sh, 0x8B81, ctypes.byref(st))
+                if not st.value:
+                    glDeleteShader(sh); return 0
+                return sh
+
+            def build_program(vs, fs):
+                v = compile_shader(0x8B31, vs)
+                f = compile_shader(0x8B30, fs)
+                if not v or not f:
+                    if v: glDeleteShader(v)
+                    if f: glDeleteShader(f)
+                    return 0
+                p = glCreateProgram()
+                glAttachShader(p, v); glAttachShader(p, f)
+                glLinkProgram(p)
+                glDeleteShader(v); glDeleteShader(f)
+                st = ctypes.c_int(0)
+                glGetProgramiv(p, 0x8B82, ctypes.byref(st))
+                if not st.value:
+                    glDeleteProgram(p); return 0
+                return p
+
+            stress_prog = build_program(VERT, STRESS_FRAG)
+            blit_prog   = build_program(VERT, BLIT_FRAG)
+
+            if stress_prog and blit_prog:
+                s_pos  = glGetAttribLocation(stress_prog,  b"aPos")
+                s_time = glGetUniformLocation(stress_prog, b"uTime")
+                s_prev = glGetUniformLocation(stress_prog, b"uPrev")
+                b_pos  = glGetAttribLocation(blit_prog,    b"aPos")
+                b_tex  = glGetUniformLocation(blit_prog,   b"uTex")
+
+                FBO_W, FBO_H = 1920, 1080
+                GL_TEXTURE_2D = 0x0DE1; GL_RGBA = 0x1908; GL_UNSIGNED_BYTE = 0x1401
+                GL_LINEAR = 0x2601; GL_TEXTURE_MIN_FILTER = 0x2801
+                GL_TEXTURE_MAG_FILTER = 0x2800; GL_TEXTURE_WRAP_S = 0x2802
+                GL_TEXTURE_WRAP_T = 0x2803; GL_CLAMP_TO_EDGE = 0x812F
+                GL_FRAMEBUFFER = 0x8D40; GL_COLOR_ATTACHMENT0 = 0x8CE0
+                GL_FRAMEBUFFER_COMPLETE = 0x8CD5; GL_TEXTURE0 = 0x84C0
+                GL_FLOAT = 0x1406; GL_TRIANGLES = 0x0004
+
+                tex_ids = (ctypes.c_uint * 2)(0, 0)
+                fbo_ids = (ctypes.c_uint * 2)(0, 0)
+                gl.glGenTextures(2, tex_ids)
+                glGenFramebuffers(2, fbo_ids)
+
+                fbo_ok = True
+                for i in range(2):
+                    gl.glBindTexture(GL_TEXTURE_2D, tex_ids[i])
+                    gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, FBO_W, FBO_H, 0,
+                                    GL_RGBA, GL_UNSIGNED_BYTE, None)
+                    gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+                    gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+                    gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+                    gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+                    glBindFramebuffer(GL_FRAMEBUFFER, fbo_ids[i])
+                    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                           GL_TEXTURE_2D, tex_ids[i], 0)
+                    if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+                        fbo_ok = False; break
+
+                glBindFramebuffer(GL_FRAMEBUFFER, 0)
+                gl.glBindTexture(GL_TEXTURE_2D, 0)
+
+                if fbo_ok:
+                    use_shaders = True
+
+        except Exception:
+            pass  # fall through to legacy render loop
+
+        quad    = (ctypes.c_float * 12)(
+            -1.0, -1.0,  1.0, -1.0,  -1.0,  1.0,
+             1.0, -1.0,  1.0,  1.0,  -1.0,  1.0)
+        quad_vp = ctypes.cast(quad, ctypes.c_void_p)
+
+        if use_shaders:
+            # ── GLSL shader path: 60 FBO passes × 1920×1080 × 80 trig iters ──
+            PASSES = 60
+            t0 = time.time()
+            while True:
+                t = ctypes.c_float(time.time() - t0)
+                gl.glViewport(0, 0, FBO_W, FBO_H)
+                glUseProgram(stress_prog)
+                glUniform1f(s_time, t)
+                glEnableVertexAttribArray(s_pos)
+                glVertexAttribPointer(s_pos, 2, GL_FLOAT, 0, 0, quad_vp)
+                cur = 0
+                for _ in range(PASSES):
+                    glBindFramebuffer(GL_FRAMEBUFFER, fbo_ids[cur])
+                    glActiveTexture(GL_TEXTURE0)
+                    gl.glBindTexture(GL_TEXTURE_2D, tex_ids[1 - cur])
+                    glUniform1i(s_prev, 0)
+                    gl.glDrawArrays(GL_TRIANGLES, 0, 6)
+                    cur ^= 1
+                glBindFramebuffer(GL_FRAMEBUFFER, 0)
+                gl.glViewport(0, 0, W, H)
+                glUseProgram(blit_prog)
+                glActiveTexture(GL_TEXTURE0)
+                gl.glBindTexture(GL_TEXTURE_2D, tex_ids[1])
+                glUniform1i(b_tex, 0)
+                glEnableVertexAttribArray(b_pos)
+                glVertexAttribPointer(b_pos, 2, GL_FLOAT, 0, 0, quad_vp)
+                gl.glDrawArrays(GL_TRIANGLES, 0, 6)
+                gdi.SwapBuffers(hdc)
+        else:
+            # ── Legacy fallback: fixed-function fill-rate flood ───────────────
+            gl.glEnableClientState.argtypes = [ctypes.c_uint]
+            gl.glVertexPointer.argtypes     = [ctypes.c_int, ctypes.c_uint,
+                                               ctypes.c_int, ctypes.c_void_p]
+            gl.glDrawArrays.argtypes        = [ctypes.c_uint, ctypes.c_int, ctypes.c_int]
+            gl.glClear.argtypes             = [ctypes.c_uint]
+            gl.glColor4f.argtypes           = [ctypes.c_float] * 4
+            gl.glViewport.argtypes          = [ctypes.c_int] * 4
+            gl.glEnable.argtypes            = [ctypes.c_uint]
+            gl.glBlendFunc.argtypes         = [ctypes.c_uint, ctypes.c_uint]
+            gl.glViewport(0, 0, W, H)
+            gl.glEnableClientState(0x8074)
+            gl.glVertexPointer(2, 0x1406, 0, quad_vp)
+            gl.glEnable(0x0BE2)
+            gl.glBlendFunc(0x0302, 0x0303)
+            t = 0.0
+            while True:
+                gl.glClear(0x00004000)
+                gl.glColor4f(abs(math.sin(t)), abs(math.cos(t*1.3)),
+                             abs(math.sin(t*0.7)), 0.003)
+                for _ in range(5000):
+                    gl.glDrawArrays(0x0004, 0, 6)
+                gdi.SwapBuffers(hdc)
+                t += 0.01
+
+    except Exception:
+        pass  # process exits cleanly if anything fails
+
 
 def _bench_cpu_worker_fn(n_iters):
     """Worker for ProcessPoolExecutor multi-core benchmark."""
@@ -407,6 +1122,19 @@ def collect_sysinfo():
             R("Swap total",   fmt_bytes(sw.total))
             R("Swap utilizat",fmt_bytes(sw.used))
 
+    S("PLĂCI VIDEO (GPU)")
+    try:
+        gpus = _get_gpu_list()
+        if gpus:
+            for g in gpus:
+                vram_str = f"  •  {g['vram_mb']} MB VRAM" if g['vram_mb'] > 0 else ""
+                label = "GPU dedicat" if g['vram_mb'] > 512 else "GPU integrat"
+                R(label, g['name'][:60] + vram_str, CYAN)
+        else:
+            R("GPU", "Nedetectat", T2)
+    except Exception:
+        R("GPU", "Eroare detecție", T2)
+
     S("STOCARE")
     disk_models = _get_disk_models()
     for i, model in enumerate(disk_models):
@@ -620,7 +1348,7 @@ class StressEngine:
     @property
     def running(self): return self._running.is_set()
 
-    def start(self, stype, n_threads, duration, on_stats, on_done):
+    def start(self, stype, n_threads, duration, on_stats, on_done, gpu_adapter_idx=0):
         if self._running.is_set(): return
         self._running.set(); self._iters = 0; self._chunks.clear()
 
@@ -648,7 +1376,10 @@ class StressEngine:
             threading.Thread(target=self._mem, daemon=True).start()
 
         for _ in range(gpu_count):
-            threading.Thread(target=self._gpu, daemon=True).start()
+            p = multiprocessing.Process(target=_gpu_stress_worker_fn,
+                                        args=(gpu_adapter_idx,), daemon=True)
+            p.start()
+            self._cpu_procs.append(p)
 
         threading.Thread(target=self._monitor,
                          args=(n_threads, duration, on_stats, on_done),
@@ -703,150 +1434,6 @@ class StressEngine:
                         del self._chunks[:max(1, len(self._chunks)//2)]
                 time.sleep(1.0)
 
-    def _gpu(self):
-        """GPU stress via opengl32.dll (ctypes, always present on Windows).
-        Creates a 1×1 hidden window with an OpenGL context and renders
-        thousands of triangles per frame — actual GPU 3D utilisation."""
-        try:
-            self._gpu_opengl()
-        except Exception:
-            pass  # GPU stress unavailable on this machine
-
-    def _gpu_opengl(self):
-        import ctypes, ctypes.wintypes as wt
-
-        gl   = ctypes.WinDLL("opengl32")
-        gdi  = ctypes.windll.gdi32
-        user = ctypes.windll.user32
-        k32  = ctypes.windll.kernel32
-
-        class PIXELFORMATDESCRIPTOR(ctypes.Structure):
-            _fields_ = [
-                ("nSize", wt.WORD), ("nVersion", wt.WORD), ("dwFlags", wt.DWORD),
-                ("iPixelType", ctypes.c_ubyte), ("cColorBits", ctypes.c_ubyte),
-                ("cRedBits",   ctypes.c_ubyte), ("cRedShift",   ctypes.c_ubyte),
-                ("cGreenBits", ctypes.c_ubyte), ("cGreenShift", ctypes.c_ubyte),
-                ("cBlueBits",  ctypes.c_ubyte), ("cBlueShift",  ctypes.c_ubyte),
-                ("cAlphaBits", ctypes.c_ubyte), ("cAlphaShift", ctypes.c_ubyte),
-                ("cAccumBits", ctypes.c_ubyte), ("cAccumRedBits", ctypes.c_ubyte),
-                ("cAccumGreenBits", ctypes.c_ubyte), ("cAccumBlueBits", ctypes.c_ubyte),
-                ("cAccumAlphaBits", ctypes.c_ubyte), ("cDepthBits", ctypes.c_ubyte),
-                ("cStencilBits", ctypes.c_ubyte), ("cAuxBuffers", ctypes.c_ubyte),
-                ("iLayerType", ctypes.c_ubyte), ("bReserved", ctypes.c_ubyte),
-                ("dwLayerMask", wt.DWORD), ("dwVisibleMask", wt.DWORD),
-                ("dwDamageMask", wt.DWORD),
-            ]
-
-        WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_longlong,
-                                     wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM)
-        _proc = WNDPROC(lambda h, m, w, l: user.DefWindowProcW(h, m, w, l))
-
-        class WNDCLASSW(ctypes.Structure):
-            _fields_ = [
-                ("style", wt.UINT), ("lpfnWndProc", WNDPROC),
-                ("cbClsExtra", ctypes.c_int), ("cbWndExtra", ctypes.c_int),
-                ("hInstance", wt.HINSTANCE), ("hIcon", wt.HANDLE),
-                ("hCursor", wt.HANDLE), ("hbrBackground", wt.HBRUSH),
-                ("lpszMenuName", wt.LPCWSTR), ("lpszClassName", wt.LPCWSTR),
-            ]
-
-        hinstance  = k32.GetModuleHandleW(None)
-        class_name = "ZFGLStress"
-        wc = WNDCLASSW()
-        wc.lpfnWndProc   = _proc
-        wc.hInstance     = hinstance
-        wc.lpszClassName = class_name
-        user.RegisterClassW(ctypes.byref(wc))
-
-        # Large visible window — GPU needs real screen pixels to show utilisation
-        W, H = 1280, 720
-        sw = user.GetSystemMetrics(0)   # screen width
-        sh = user.GetSystemMetrics(1)   # screen height
-        hwnd = user.CreateWindowExW(
-            0x00000080,                             # WS_EX_TOOLWINDOW
-            class_name, "ZF-Info64 GPU Stress",
-            0x80000000 | 0x10000000,                # WS_POPUP | WS_VISIBLE
-            (sw - W) // 2, (sh - H) // 2, W, H,
-            None, None, hinstance, None)
-        if not hwnd:
-            raise RuntimeError("CreateWindowEx failed")
-        user.ShowWindow(hwnd, 1)
-
-        hdc = user.GetDC(hwnd)
-        pfd = PIXELFORMATDESCRIPTOR()
-        pfd.nSize     = ctypes.sizeof(PIXELFORMATDESCRIPTOR)
-        pfd.nVersion  = 1
-        pfd.dwFlags   = 4 | 32 | 1   # DRAW_TO_WINDOW | SUPPORT_OPENGL | DOUBLEBUFFER
-        pfd.cColorBits = 32
-        pfd.cDepthBits = 24
-        pf = gdi.ChoosePixelFormat(hdc, ctypes.byref(pfd))
-        gdi.SetPixelFormat(hdc, pf, ctypes.byref(pfd))
-
-        hglrc = gl.wglCreateContext(hdc)
-        gl.wglMakeCurrent(hdc, hglrc)
-
-        # Disable VSync via wglSwapIntervalEXT so GPU runs at max throughput
-        gl.wglGetProcAddress.restype  = ctypes.c_void_p
-        gl.wglGetProcAddress.argtypes = [ctypes.c_char_p]
-        addr = gl.wglGetProcAddress(b"wglSwapIntervalEXT")
-        if addr:
-            SwapInterval = ctypes.WINFUNCTYPE(ctypes.c_int, ctypes.c_int)(addr)
-            SwapInterval(0)
-
-        # Full-screen quad (two triangles, NDC coords)
-        quad = (ctypes.c_float * 12)(
-            -1.0, -1.0,   1.0, -1.0,  -1.0,  1.0,
-             1.0, -1.0,   1.0,  1.0,  -1.0,  1.0
-        )
-
-        GL_FLOAT               = 0x1406
-        GL_TRIANGLES           = 0x0004
-        GL_COLOR_BUFFER_BIT    = 0x00004000
-        GL_VERTEX_ARRAY        = 0x8074
-        GL_BLEND               = 0x0BE2
-        GL_SRC_ALPHA           = 0x0302
-        GL_ONE_MINUS_SRC_ALPHA = 0x0303
-
-        gl.glEnableClientState.argtypes = [ctypes.c_uint]
-        gl.glEnable.argtypes            = [ctypes.c_uint]
-        gl.glBlendFunc.argtypes         = [ctypes.c_uint, ctypes.c_uint]
-        gl.glVertexPointer.argtypes     = [ctypes.c_int, ctypes.c_uint,
-                                           ctypes.c_int, ctypes.c_void_p]
-        gl.glDrawArrays.argtypes        = [ctypes.c_uint, ctypes.c_int, ctypes.c_int]
-        gl.glClear.argtypes             = [ctypes.c_uint]
-        gl.glClearColor.argtypes        = [ctypes.c_float] * 4
-        gl.glColor4f.argtypes           = [ctypes.c_float] * 4
-        gl.glViewport.argtypes          = [ctypes.c_int] * 4
-
-        gl.glViewport(0, 0, W, H)
-        gl.glEnableClientState(GL_VERTEX_ARRAY)
-        gl.glVertexPointer(2, GL_FLOAT, 0, quad)
-        gl.glEnable(GL_BLEND)
-        gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        gl.glClearColor(0.031, 0.031, 0.071, 1.0)
-
-        # Key strategy: 5000 full-screen quad blended draws per frame.
-        # Python just calls glDrawArrays repeatedly — the GPU does all rasterisation.
-        # At 1280×720, each pass = 921 600 pixel blend ops → GPU fill-rate saturated.
-        PASSES = 5000
-        t = 0.0
-        while self._running.is_set():
-            gl.glClear(GL_COLOR_BUFFER_BIT)
-            # Rotate colour every frame — one ctypes call outside the hot loop
-            gl.glColor4f(abs(math.sin(t)), abs(math.cos(t*1.3)),
-                         abs(math.sin(t*0.7)), 0.003)
-            for _ in range(PASSES):
-                gl.glDrawArrays(GL_TRIANGLES, 0, 6)
-            gdi.SwapBuffers(hdc)
-            t += 0.01
-            with self._lock: self._iters += 1
-
-        gl.wglMakeCurrent(None, None)
-        gl.wglDeleteContext(hglrc)
-        user.ReleaseDC(hwnd, hdc)
-        user.DestroyWindow(hwnd)
-        user.UnregisterClassW(class_name, hinstance)
-
     def _monitor(self, n_threads, duration, on_stats, on_done):
         t0 = time.time(); prev_i = 0; prev_cpu = self._cpu_times()
         while self._running.is_set():
@@ -893,7 +1480,7 @@ class StressEngine:
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("ZF-Info64")
+        self.title(f"ZF-Info64 {APP_EDITION}")
         self.configure(bg=BG)
         self.geometry("860x680")
         self.minsize(700, 520)
@@ -905,14 +1492,13 @@ class App(tk.Tk):
                 self.iconbitmap(default=str(icon_path))
             except Exception:
                 pass
-            if HAS_PIL:
-                try:
-                    from PIL import Image, ImageTk
-                    _img = Image.open(str(icon_path))
-                    self._icon_ref = ImageTk.PhotoImage(_img)
-                    self.iconphoto(True, self._icon_ref)
-                except Exception:
-                    pass
+            try:
+                from PIL import Image, ImageTk
+                _img = Image.open(str(icon_path))
+                self._icon_ref = ImageTk.PhotoImage(_img)
+                self.iconphoto(True, self._icon_ref)
+            except Exception:
+                pass
 
         self._stress = StressEngine()
         self._bench_running = False
@@ -977,7 +1563,8 @@ class App(tk.Tk):
         nb.pack(fill="both", expand=True)
 
         nb.add(self._tab_system(nb),    text="   💻  Sistem   ")
-        nb.add(self._tab_benchmark(nb), text="   ⚡  Benchmark   ")
+        if APP_EDITION != "Free":
+            nb.add(self._tab_benchmark(nb), text="   ⚡  Benchmark   ")
         nb.add(self._tab_stress(nb),    text="   🔥  Stress Test   ")
 
     # ── TAB: System ───────────────────────────────────────────────────────────
@@ -1181,13 +1768,51 @@ class App(tk.Tk):
         section_header(p, "TIP TEST", "⚙", color=CYAN, bg=BG)
         cc = card(p)
         self._stress_type = tk.StringVar(value="CPU")
-        for txt, val, c in [
+
+        # GPU selector — shown only for GPU / Mixed All (hidden in Free edition)
+        gpu_card = tk.Frame(cc, bg=CARD)
+        if APP_EDITION != "Free":
+            gpu_card.pack(fill="x", pady=(0, 6))
+        tk.Label(gpu_card, text="Placă video:", fg=T2, bg=CARD,
+                 font=("Segoe UI", 10)).pack(side="left")
+
+        # Build GPU list from DXGI (with fallback to WMIC names)
+        self._dxgi_adapters = _enumerate_dxgi_adapters()
+        if not self._dxgi_adapters:
+            wmic_gpus = _get_gpu_list()
+            self._dxgi_adapters = [{'index': i, 'name': g['name'], 'vram_mb': g['vram_mb']}
+                                    for i, g in enumerate(wmic_gpus)]
+        gpu_labels = [
+            f"{g['name']}  ({g['vram_mb']} MB)" if g['vram_mb'] > 0 else g['name']
+            for g in self._dxgi_adapters
+        ] or ["GPU implicit"]
+
+        self._gpu_sel = ttk.Combobox(gpu_card, values=gpu_labels, state="readonly",
+                                      width=46, font=("Segoe UI", 10))
+        self._gpu_sel.current(0)
+        self._gpu_sel.pack(side="left", padx=(8, 0))
+
+        def _on_type_change(*_):
+            stype = self._stress_type.get()
+            gpu_card.pack_configure(
+                fill="x" if stype in ("GPU", "MIXED_ALL") else "x")
+            # Always visible but enabled/disabled
+            state = "readonly" if stype in ("GPU", "MIXED_ALL") else "disabled"
+            self._gpu_sel.config(state=state)
+        self._stress_type.trace_add("write", _on_type_change)
+        _on_type_change()  # set initial state
+
+        _stress_options = [
             ("CPU Stress — încărcare maximă pe toate nucleele",   "CPU",      GREEN),
             ("Memory Stress — alocare/dealocare intensivă RAM",   "MEM",      PURPLE),
-            ("GPU Stress — rendering 2D intensiv 1080p (PIL)",    "GPU",      RED),
+            ("GPU Stress — D3D11 compute shader / OpenGL 2.0",    "GPU",      RED),
             ("Mixed Stress — CPU + Memorie combinat",             "MIXED",    CYAN),
             ("Mixed All — CPU + Memorie + GPU",                   "MIXED_ALL",ORANGE),
-        ]:
+        ]
+        if APP_EDITION == "Free":
+            _stress_options = [o for o in _stress_options if o[1] == "CPU"]
+
+        for txt, val, c in _stress_options:
             row = tk.Frame(cc, bg=CARD, pady=3)
             row.pack(fill="x")
             tk.Radiobutton(row, text=txt, variable=self._stress_type, value=val,
@@ -1246,7 +1871,9 @@ class App(tk.Tk):
                              state="disabled", wrap="word",
                              insertbackground=CYAN)
         self._log.pack(fill="x")
-        self._log_write("Selectează tipul de test și apasă START.\n")
+        import tempfile as _tp, os as _ow
+        _glog = _ow.path.join(_tp.gettempdir(), "ZFInfo64_gpu_stress.log")
+        self._log_write(f"Selectează tipul de test și apasă START.\nGPU log: {_glog}\n")
 
         tk.Frame(p, bg=BG, height=20).pack()
         return root
@@ -1261,12 +1888,17 @@ class App(tk.Tk):
             stype   = self._stress_type.get()
             dur     = self._duration.get()
             threads = self._thr_var.get()
+            gpu_idx = self._gpu_sel.current() if self._dxgi_adapters else 0
+            gpu_name = (self._dxgi_adapters[gpu_idx]['name']
+                        if self._dxgi_adapters else "GPU implicit")
             self._btn_stress.config(text="■   STOP", bg=RED)
             self._stress_status.config(text="Rulează...", fg=GREEN)
             dtxt = f"{dur}s" if dur > 0 else "∞"
-            self._log_write(f"▶ {stype} • {threads} thread-uri • {dtxt}\n")
+            gpu_info = f" • {gpu_name}" if stype in ("GPU", "MIXED_ALL") else ""
+            self._log_write(f"▶ {stype} • {threads} thread-uri • {dtxt}{gpu_info}\n")
             self._stress.start(stype, threads, dur,
-                               self._on_stats, self._on_done)
+                               self._on_stats, self._on_done,
+                               gpu_adapter_idx=gpu_idx)
 
     def _on_stats(self, s):
         h, r = divmod(s["elapsed"], 3600)
@@ -1308,7 +1940,7 @@ if __name__ == "__main__":
     try: ctypes.windll.shcore.SetProcessDpiAwareness(1)
     except Exception: pass
     # Set AppUserModelID so taskbar uses the correct icon instead of Python's
-    try: ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ZF.Info64.App")
+    try: ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(f"ZF.Info64.{APP_EDITION}")
     except Exception: pass
 
     app = App()

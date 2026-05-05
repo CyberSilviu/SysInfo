@@ -1,0 +1,39 @@
+<variant
+    name="proRelease"
+    package="com.sysinfo.app"
+    minSdkVersion="26"
+    targetSdkVersion="34"
+    shrinking="true"
+    mergedManifest="build\intermediates\merged_manifest\proRelease\processProReleaseMainManifest\AndroidManifest.xml"
+    proguardFiles="build\intermediates\default_proguard_files\global\proguard-android-optimize.txt-8.13.2;proguard-rules.pro"
+    partialResultsDir="build\intermediates\lint_vital_partial_results\proRelease\lintVitalAnalyzeProRelease\out"
+    desugaredMethodsFiles="C:\Users\Silviu\.gradle\caches\8.13\transforms\17fd29d1a118220a1c84f0bb4ce12f7e\transformed\D8BackportedDesugaredMethods.txt">
+  <buildFeatures
+      viewBinding="true"
+      namespacing="REQUIRED"/>
+  <sourceProviders>
+    <sourceProvider
+        manifests="src\main\AndroidManifest.xml"
+        javaDirectories="src\main\java;src\pro\java;src\release\java;src\proRelease\java;src\main\kotlin;src\pro\kotlin;src\release\kotlin;src\proRelease\kotlin"
+        resDirectories="src\main\res;src\pro\res;src\release\res;src\proRelease\res"
+        assetsDirectories="src\main\assets;src\pro\assets;src\release\assets;src\proRelease\assets"/>
+  </sourceProviders>
+  <testSourceProviders>
+  </testSourceProviders>
+  <testFixturesSourceProviders>
+  </testFixturesSourceProviders>
+  <resValues>
+    <resValue
+        type="string"
+        name="app_name"
+        value="ZF-INFO64 Pro" />
+  </resValues>
+  <artifact
+      classOutputs="build\intermediates\javac\proRelease\compileProReleaseJavaWithJavac\classes;build\tmp\kotlin-classes\proRelease;build\kotlinToolingMetadata;build\intermediates\compile_and_runtime_not_namespaced_r_class_jar\proRelease\processProReleaseResources\R.jar"
+      type="MAIN"
+      applicationId="com.zfinfo64.app"
+      generatedSourceFolders="build\generated\ap_generated_sources\proRelease\out;build\generated\source\buildConfig\pro\release;build\generated\data_binding_base_class_source_out\proRelease\out"
+      generatedResourceFolders="build\generated\res\resValues\pro\release"
+      desugaredMethodsFiles="C:\Users\Silviu\.gradle\caches\8.13\transforms\17fd29d1a118220a1c84f0bb4ce12f7e\transformed\D8BackportedDesugaredMethods.txt">
+  </artifact>
+</variant>

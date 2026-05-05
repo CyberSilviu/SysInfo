@@ -38,11 +38,20 @@
                 android:fontFamily="monospace"
                 android:layout_marginVertical="8dp" />
 
+            <TextView
+                android:id="@+id/tvScoreRating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Apasă RULEAZĂ pentru a începe"
+                android:textColor="@color/text_tertiary"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:layout_marginBottom="12dp" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRunAll"
                 android:layout_width="match_parent"
                 android:layout_height="52dp"
-                android:layout_marginTop="12dp"
                 android:text="@string/btn_run_all"
                 android:textColor="@color/bg_primary"
                 android:textSize="14sp"
@@ -79,7 +88,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Operații aritmetice pe un singur nucleu"
+                        android:text="Operații trigonometrice / FP"
                         android:textColor="@color/text_secondary"
                         android:textSize="11sp"
                         android:layout_marginTop="2dp" />
@@ -105,6 +114,68 @@
 
             <TextView
                 android:id="@+id/tvStatusSingle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Pregătit"
+                android:textColor="@color/text_tertiary"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- CPU Integer -->
+        <LinearLayout
+            style="@style/InfoCard"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        style="@style/SectionTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="CPU INTEGER"
+                        android:textColor="@color/accent_cyan" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Operații întregi, XOR, shift, rotații"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="11sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvScoreInteger"
+                    style="@style/BenchScore"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="---" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progressInteger"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="12dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/progress_bar_cyan" />
+
+            <TextView
+                android:id="@+id/tvStatusInteger"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Pregătit"
@@ -203,7 +274,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Viteză citire/scriere RAM"
+                        android:text="Bandwidth RAM: scriere, citire, acces aleator"
                         android:textColor="@color/text_secondary"
                         android:textSize="11sp"
                         android:layout_marginTop="2dp" />
@@ -265,7 +336,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Viteză citire/scriere stocare internă"
+                        android:text="Viteză citire/scriere stocare internă (16 MB)"
                         android:textColor="@color/text_secondary"
                         android:textSize="11sp"
                         android:layout_marginTop="2dp" />

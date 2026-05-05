@@ -23,7 +23,7 @@
     <color name="text_secondary">#FF8B949E</color>
     <color name="text_tertiary">#FF484F58</color>
     <color name="white">#FFFFFFFF</color>
-    <string name="app_name">SysInfo Pro</string>
+    <string name="app_name">ZF-INFO64</string>
     <string name="bench_cpu_multi">CPU Multi-Core</string>
     <string name="bench_cpu_single">CPU Single-Core</string>
     <string name="bench_memory">Memorie</string>
@@ -48,8 +48,10 @@
     <string name="section_system">Sistem</string>
     <string name="stress_cpu">CPU Stress</string>
     <string name="stress_duration">Durată</string>
+    <string name="stress_gpu">GPU Stress</string>
     <string name="stress_memory">Memory Stress</string>
     <string name="stress_mixed">Mixed Stress</string>
+    <string name="stress_mixed_all">Mixed All Stress</string>
     <string name="stress_status_done">Finalizat</string>
     <string name="stress_status_idle">Inactiv</string>
     <string name="stress_status_running">Rulează...</string>

@@ -1,0 +1,130 @@
+[
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_bg_card_elevated.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/bg_card_elevated.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-mdpi_ic_launcher.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-mdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/layout_item_info_row.xml.flat",
+        "source": "com.sysinfo.app-main-52:/layout/item_info_row.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xxxhdpi_ic_launcher.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xxxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xxxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/layout_fragment_benchmark.xml.flat",
+        "source": "com.sysinfo.app-main-52:/layout/fragment_benchmark.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xxhdpi_ic_launcher.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xxhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_bg_card_rounded.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/bg_card_rounded.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xhdpi_ic_launcher_round.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/menu_bottom_nav_menu.xml.flat",
+        "source": "com.sysinfo.app-main-52:/menu/bottom_nav_menu.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-hdpi_ic_launcher_round.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-hdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_btn_accent.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/btn_accent.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_zf_logo.png.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/zf_logo.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/layout_fragment_stress_test.xml.flat",
+        "source": "com.sysinfo.app-main-52:/layout/fragment_stress_test.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xhdpi_ic_launcher_foreground.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xhdpi/ic_launcher_foreground.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-mdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/color_bottom_nav_colors.xml.flat",
+        "source": "com.sysinfo.app-main-52:/color/bottom_nav_colors.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/layout_fragment_device.xml.flat",
+        "source": "com.sysinfo.app-main-52:/layout/fragment_device.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_btn_red.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/btn_red.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xhdpi_ic_launcher.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xxhdpi_ic_launcher_foreground.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xxhdpi/ic_launcher_foreground.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-mdpi_ic_launcher_foreground.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-mdpi/ic_launcher_foreground.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xxhdpi_ic_launcher_round.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/layout_activity_main.xml.flat",
+        "source": "com.sysinfo.app-main-52:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-xxxhdpi_ic_launcher_foreground.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-xxxhdpi/ic_launcher_foreground.png"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_progress_bar_green.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/progress_bar_green.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/drawable_progress_bar_cyan.xml.flat",
+        "source": "com.sysinfo.app-main-52:/drawable/progress_bar_cyan.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-freeRelease-49:/mipmap-hdpi_ic_launcher_foreground.png.flat",
+        "source": "com.sysinfo.app-main-52:/mipmap-hdpi/ic_launcher_foreground.png"
+    }
+]

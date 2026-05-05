@@ -74,6 +74,32 @@
                 android:orientation="vertical" />
         </LinearLayout>
 
+        <!-- GPU Card -->
+        <LinearLayout
+            style="@style/InfoCard"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/SectionTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/section_gpu"
+                android:drawablePadding="8dp"
+                android:drawableTint="@color/accent_red" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="10dp"
+                android:background="@color/divider" />
+
+            <LinearLayout
+                android:id="@+id/gpuInfoContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
         <!-- Memory Card -->
         <LinearLayout
             style="@style/InfoCard"

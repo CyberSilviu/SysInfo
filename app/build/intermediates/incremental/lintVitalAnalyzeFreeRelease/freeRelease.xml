@@ -1,0 +1,39 @@
+<variant
+    name="freeRelease"
+    package="com.sysinfo.app"
+    minSdkVersion="26"
+    targetSdkVersion="34"
+    shrinking="true"
+    mergedManifest="build\intermediates\merged_manifest\freeRelease\processFreeReleaseMainManifest\AndroidManifest.xml"
+    proguardFiles="build\intermediates\default_proguard_files\global\proguard-android-optimize.txt-8.13.2;proguard-rules.pro"
+    partialResultsDir="build\intermediates\lint_vital_partial_results\freeRelease\lintVitalAnalyzeFreeRelease\out"
+    desugaredMethodsFiles="C:\Users\Silviu\.gradle\caches\8.13\transforms\17fd29d1a118220a1c84f0bb4ce12f7e\transformed\D8BackportedDesugaredMethods.txt">
+  <buildFeatures
+      viewBinding="true"
+      namespacing="REQUIRED"/>
+  <sourceProviders>
+    <sourceProvider
+        manifests="src\main\AndroidManifest.xml"
+        javaDirectories="src\main\java;src\free\java;src\release\java;src\freeRelease\java;src\main\kotlin;src\free\kotlin;src\release\kotlin;src\freeRelease\kotlin"
+        resDirectories="src\main\res;src\free\res;src\release\res;src\freeRelease\res"
+        assetsDirectories="src\main\assets;src\free\assets;src\release\assets;src\freeRelease\assets"/>
+  </sourceProviders>
+  <testSourceProviders>
+  </testSourceProviders>
+  <testFixturesSourceProviders>
+  </testFixturesSourceProviders>
+  <resValues>
+    <resValue
+        type="string"
+        name="app_name"
+        value="ZF-INFO64 Free" />
+  </resValues>
+  <artifact
+      classOutputs="build\intermediates\javac\freeRelease\compileFreeReleaseJavaWithJavac\classes;build\tmp\kotlin-classes\freeRelease;build\kotlinToolingMetadata;build\intermediates\compile_and_runtime_not_namespaced_r_class_jar\freeRelease\processFreeReleaseResources\R.jar"
+      type="MAIN"
+      applicationId="com.zfinfo64.app.free"
+      generatedSourceFolders="build\generated\ap_generated_sources\freeRelease\out;build\generated\source\buildConfig\free\release;build\generated\data_binding_base_class_source_out\freeRelease\out"
+      generatedResourceFolders="build\generated\res\resValues\free\release"
+      desugaredMethodsFiles="C:\Users\Silviu\.gradle\caches\8.13\transforms\17fd29d1a118220a1c84f0bb4ce12f7e\transformed\D8BackportedDesugaredMethods.txt">
+  </artifact>
+</variant>

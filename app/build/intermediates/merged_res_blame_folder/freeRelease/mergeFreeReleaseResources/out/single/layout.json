@@ -1,0 +1,22 @@
+[
+    {
+        "merged": "com.sysinfo.app-mergeFreeReleaseResources-48:/layout/item_info_row.xml",
+        "source": "com.sysinfo.app-main-52:/layout/item_info_row.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-mergeFreeReleaseResources-48:/layout/fragment_benchmark.xml",
+        "source": "com.sysinfo.app-main-52:/layout/fragment_benchmark.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-mergeFreeReleaseResources-48:/layout/fragment_device.xml",
+        "source": "com.sysinfo.app-main-52:/layout/fragment_device.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-mergeFreeReleaseResources-48:/layout/activity_main.xml",
+        "source": "com.sysinfo.app-main-52:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.sysinfo.app-mergeFreeReleaseResources-48:/layout/fragment_stress_test.xml",
+        "source": "com.sysinfo.app-main-52:/layout/fragment_stress_test.xml"
+    }
+]

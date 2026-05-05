@@ -1,0 +1,4 @@
+#Mon Apr 20 22:43:47 EEST 2026
+base.0=C\:\\Users\\Silviu\\Desktop\\SysInfo\\app\\build\\intermediates\\dex\\proRelease\\minifyProReleaseWithR8\\classes.dex
+path.0=classes.dex
+renamed.0=classes.dex

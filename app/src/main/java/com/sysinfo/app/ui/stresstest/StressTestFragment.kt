@@ -12,6 +12,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
+import com.sysinfo.app.BuildConfig
 import com.sysinfo.app.R
 import com.sysinfo.app.utils.StressTestEngine
 
@@ -39,52 +40,66 @@ class StressTestFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        glSurfaceView?.onResume()  // always resume GL thread so surface is ready
+        // Only resume GL thread if renderer was already initialized
+        if (gpuRenderer != null) glSurfaceView?.onResume()
     }
 
     override fun onPause() {
         super.onPause()
-        glSurfaceView?.onPause()
+        // Only pause GL thread if renderer was already initialized
+        if (gpuRenderer != null) glSurfaceView?.onPause()
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        stopGpuSurface()
+        destroyGpuSurface()
         stressEngine.stop()
         glSurfaceView = null
     }
 
-    private fun setupGlSurface(view: View) {
-        val sv = view.findViewById<GLSurfaceView>(R.id.gpuSurface)
-        sv.setEGLContextClientVersion(2)
-        val renderer = GpuStressRenderer(stressEngine.totalIterations)
-        sv.setRenderer(renderer)
-        sv.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY  // start paused
-        glSurfaceView = sv
-        gpuRenderer   = renderer
-    }
-
-    private fun startGpuSurface() {
-        glSurfaceView?.let {
-            it.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            it.visibility = View.VISIBLE
-            gpuActive = true
+    private fun startGpuSurface(view: View) {
+        val sv = view.findViewById<GLSurfaceView>(R.id.gpuSurface) ?: return
+        // Make VISIBLE before setRenderer so EGL window surface exists when GL thread starts
+        sv.visibility = View.VISIBLE
+        if (gpuRenderer == null) {
+            sv.setEGLContextClientVersion(2)
+            val renderer = GpuStressRenderer(stressEngine.totalIterations)
+            sv.setRenderer(renderer)
+            sv.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            glSurfaceView = sv
+            gpuRenderer   = renderer
+        } else {
+            sv.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
         }
+        gpuActive = true
     }
 
     private fun stopGpuSurface() {
-        glSurfaceView?.let {
-            it.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
-            it.visibility = View.INVISIBLE
-        }
+        glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        glSurfaceView?.visibility = View.GONE
         gpuActive = false
     }
 
+    private fun destroyGpuSurface() {
+        glSurfaceView?.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        glSurfaceView?.visibility = View.GONE
+        gpuActive    = false
+        gpuRenderer  = null
+    }
+
     private fun setupControls(view: View) {
-        setupGlSurface(view)
         val btnStart = view.findViewById<MaterialButton>(R.id.btnStartStress)
         val tvThreadCount = view.findViewById<TextView>(R.id.tvThreadCount)
         val seekThreads = view.findViewById<SeekBar>(R.id.seekThreads)
+
+        // Free edition: hide everything except CPU stress
+        if (BuildConfig.IS_FREE) {
+            view.findViewById<View>(R.id.rbMemoryStress).visibility  = View.GONE
+            view.findViewById<View>(R.id.rbMixedStress).visibility   = View.GONE
+            view.findViewById<View>(R.id.rbGpuStress).visibility     = View.GONE
+            view.findViewById<View>(R.id.rbMixedAllStress).visibility = View.GONE
+            view.findViewById<View>(R.id.gpuSurface).visibility      = View.GONE
+        }
 
         // Set default and max thread count to number of CPU cores
         val defaultThreads = Runtime.getRuntime().availableProcessors()
@@ -157,7 +172,7 @@ class StressTestFragment : Fragment() {
         // Start GPU surface when needed
         if (stressType == StressTestEngine.StressType.GPU ||
             stressType == StressTestEngine.StressType.MIXED_ALL) {
-            startGpuSurface()
+            startGpuSurface(view)
         }
 
         // Start engine

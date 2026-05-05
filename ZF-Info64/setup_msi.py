@@ -15,12 +15,15 @@ build_exe_options = {
         "concurrent", "concurrent.futures",
         "multiprocessing",
         "subprocess", "winreg",
+        "encodings", "encodings.utf_8", "encodings.utf_16",
+        "encodings.latin_1", "encodings.cp1252", "encodings.ascii",
+        "codecs",
     ],
     "include_files": [
         ("logo ZF-Logo64.png", "logo ZF-Logo64.png"),
     ],
     "excludes": ["unittest", "xmlrpc", "pydoc", "doctest", "difflib"],
-    "optimize": 1,
+    "optimize": 0,
 }
 
 bdist_msi_options = {
@@ -46,7 +49,7 @@ setup(
     executables = [
         Executable(
             "ZF-Info64-Windows.py",
-            base            = "Win32GUI",   # no console
+            base            = "gui",          # no console
             target_name     = "ZF-Info64.exe",
             icon            = "zf_icon.ico",
             shortcut_name   = "ZF-Info64",
